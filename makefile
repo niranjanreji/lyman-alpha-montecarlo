@@ -15,7 +15,7 @@ TARGET = mc.exe
 all: $(TARGET)
 
 # Compile directly to executable (unity build)
-$(TARGET): main.cpp model.cpp physics.cpp monte_carlo.cpp common.h
+$(TARGET): main.cpp routines/model.cpp routines/physics.cpp routines/monte_carlo.cpp routines/common.h
 	$(CXX) $(CXXFLAGS) -o $@ main.cpp $(LIBS)
 	@echo Compilation successful!
 

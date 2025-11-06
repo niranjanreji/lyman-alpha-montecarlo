@@ -8,12 +8,12 @@ MAIN.CPP / NIRANJAN REJI
 
 #define _USE_MATH_DEFINES
 #include <iostream>
-#include "common.h"
+#include "routines/common.h"
 
 // Include all module .cpp files for unity build (after common.h)
-#include "model.cpp"
-#include "physics.cpp"
-#include "monte_carlo.cpp"
+#include "routines/model.cpp"
+#include "routines/physics.cpp"
+#include "routines/monte_carlo.cpp"
 
 using namespace std;
 
