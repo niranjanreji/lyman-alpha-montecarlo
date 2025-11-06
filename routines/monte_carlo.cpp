@@ -32,10 +32,6 @@ void monte_carlo(int max_photon_count, bool recoil) {
     const unsigned base_seed = 1234567u;
     auto start = chrono::high_resolution_clock::now();
 
-    // timing accumulators for tau_to_s and scatter
-    double total_tau_to_s_time = 0.0;
-    double total_scatter_time = 0.0;
-
     #pragma omp parallel
     {
         int tid = omp_get_thread_num();
@@ -45,10 +41,6 @@ void monte_carlo(int max_photon_count, bool recoil) {
         uniform_real_distribution<double> uni(1e-12,1.0 - 1e-12);
         normal_distribution<double> n;
         vector<double> local_bins(nbins, 0.0);
-
-        // thread-local timing accumulators
-        double local_tau_to_s_time = 0.0;
-        double local_scatter_time = 0.0;
 
         #pragma omp for schedule(dynamic)
         for (int photon_idx = 0; photon_idx < max_photon_count; ++photon_idx)
@@ -78,11 +70,8 @@ void monte_carlo(int max_photon_count, bool recoil) {
                 double r   = uni(rng_local);
                 double tau = -log(r);
 
-                // update photon position (with timing)
-                auto t1 = chrono::high_resolution_clock::now();
+                // update photon position
                 tau_to_s(tau, phot);
-                auto t2 = chrono::high_resolution_clock::now();
-                local_tau_to_s_time += chrono::duration<double>(t2 - t1).count();
 
                 if (escaped(phot))
                 {
@@ -102,11 +91,8 @@ void monte_carlo(int max_photon_count, bool recoil) {
 
                 int T_local = g_grid.temp(ix, iy, iz);
 
-                // scatter the photon and get radial momentum transfer (with timing)
-                auto t3 = chrono::high_resolution_clock::now();
+                // scatter the photon and get radial momentum transfer
                 double dp_r = scatter(phot, ix, iy, iz, rng_local, n, uni, recoil);
-                auto t4 = chrono::high_resolution_clock::now();
-                local_scatter_time += chrono::duration<double>(t4 - t3).count();
 
                 n_scatters++;
 
@@ -143,12 +129,10 @@ void monte_carlo(int max_photon_count, bool recoil) {
             }
         }
 
-        // merge local momentum bins and timing data
+        // merge local momentum bins
         #pragma omp critical
         {
             for (int b = 0; b < nbins; ++b) momentum_bins[b] += local_bins[b];
-            total_tau_to_s_time += local_tau_to_s_time;
-            total_scatter_time += local_scatter_time;
         }
     }
 
@@ -160,26 +144,7 @@ void monte_carlo(int max_photon_count, bool recoil) {
     cout << "\n=== Performance Statistics ===" << endl;
     cout << "Total scatters: " << total_scatters << endl;
     cout << "Average scatters per photon: " << avg_scatters << endl;
-
-    // print timing breakdown
-    // Note: times are cumulative across all threads, so we report both total CPU time and per-thread average
-    int num_threads = omp_get_max_threads();
-    double avg_tau_to_s_time = total_tau_to_s_time / num_threads;
-    double avg_scatter_time = total_scatter_time / num_threads;
-
-    cout << "\n=== Timing Breakdown ===" << endl;
-    cout << "Total wall-clock runtime: " << total_elapsed.count() << " s" << endl;
-    cout << "Number of threads: " << num_threads << endl;
-    cout << "\nPer-thread average times:" << endl;
-    cout << "  Time in tau_to_s: " << avg_tau_to_s_time << " s ("
-         << 100.0 * avg_tau_to_s_time / total_elapsed.count() << "%)" << endl;
-    cout << "  Time in scatter: " << avg_scatter_time << " s ("
-         << 100.0 * avg_scatter_time / total_elapsed.count() << "%)" << endl;
-    cout << "  Other overhead: " << (total_elapsed.count() - avg_tau_to_s_time - avg_scatter_time) << " s ("
-         << 100.0 * (total_elapsed.count() - avg_tau_to_s_time - avg_scatter_time) / total_elapsed.count() << "%)" << endl;
-    cout << "\nTotal CPU time across all threads:" << endl;
-    cout << "  tau_to_s: " << total_tau_to_s_time << " s" << endl;
-    cout << "  scatter: " << total_scatter_time << " s" << endl;
+    cout << "Total runtime: " << total_elapsed.count() << " s" << endl;
 
     // write x values to output file to be plotted using python
     ofstream fout("spectrum.txt");
