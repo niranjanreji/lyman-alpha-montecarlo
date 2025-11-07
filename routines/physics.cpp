@@ -234,19 +234,19 @@ double scatter(Photon& phot, int ix, int iy, int iz, mt19937_64& rng,
     // shift photon x value to local frame
     double dirdotv  = u_bulk_x*phot.dir_x + u_bulk_y*phot.dir_y + u_bulk_z*phot.dir_z;
     double xlocal   = phot.x - dirdotv;
-
+    
+    // generate velocity components of scattering atom
     double u_paral = u_parallel(xlocal, T_local, rng, norm, uni);
     double u_perp1 = (1/sqrt(2)) * norm(rng);
     double u_perp2 = (1/sqrt(2)) * norm(rng);
 
-    // project velocities onto i_hat, j_hat, k_hat by finding
-    // their orthonormal unit vectors first. a = random vector
+    // find basis that velocity components are in
+    // a = random vector to cross with phot.dir
     double ax    = (fabs(phot.dir_x) < 0.9) ? 1.0 : 0.0;
     double ay    = (ax != 0.0) ? 0.0 : 1.0;
     double a_mag = 1;
 
-    // atom velocity unit vectors (note az = 0)
-    // v parallel is already along photon dir, need 2 more
+    // basis vector 2 (phot.dir = basis vector 1)
     double e1x = ((phot.dir_y*0) - (phot.dir_z*ay))/(a_mag);
     double e1y = ((phot.dir_z*ax) - (phot.dir_x*0))/(a_mag);
     double e1z = ((phot.dir_x*ay) - (phot.dir_y*ax))/(a_mag);
@@ -256,20 +256,21 @@ double scatter(Photon& phot, int ix, int iy, int iz, mt19937_64& rng,
     if (e1norm < 1e-14) { e1x=0; e1y=1; e1z=0; e1norm=1; }
     e1x /= e1norm; e1y /= e1norm; e1z /= e1norm;
 
+    // basis vector 3
     double e2x = ((phot.dir_y*e1z) - (phot.dir_z*e1y));
     double e2y = ((phot.dir_z*e1x) - (phot.dir_x*e1z));
     double e2z = ((phot.dir_x*e1y) - (phot.dir_y*e1x)); 
 
-    // find scattering angle
+    // find scattering angle, clamp cosine to [-1, 1] to avoid numerical issues
     double cosine = scatter_mu(xlocal, rng, uni);
-
-    // clamp cosine to [-1, 1] to avoid numerical issues
     cosine = max(-1.0, min(1.0, cosine));
     double sine = sqrt(1.0 - cosine*cosine);
 
     // pick new direction
     double phi = uni(rng) * 2 * pi;
     double cosphi = cos(phi), sinphi = sin(phi);
+
+    // generate new direction vector
     double new_dir_x = cosine*phot.dir_x + sine*(cosphi*e1x + sinphi*e2x);
     double new_dir_y = cosine*phot.dir_y + sine*(cosphi*e1y + sinphi*e2y);
     double new_dir_z = cosine*phot.dir_z + sine*(cosphi*e1z + sinphi*e2z);
@@ -278,15 +279,10 @@ double scatter(Photon& phot, int ix, int iy, int iz, mt19937_64& rng,
     double invnorm = 1.0 / sqrt(new_dir_x*new_dir_x + new_dir_y*new_dir_y + new_dir_z*new_dir_z);
     new_dir_x *= invnorm; new_dir_y *= invnorm; new_dir_z *= invnorm;
 
-    // new_direction - old_direction vector
-    double kx = new_dir_x - phot.dir_x;
-    double ky = new_dir_y - phot.dir_y;
-    double kz = new_dir_z - phot.dir_z;
-
-    // dot product of (dimensionless) velocity and direction change
-    double u_dot_k = kx*u_bulk_x + ky*u_bulk_y + kz*u_bulk_z;
-    double x_new   = phot.x + u_dot_k + u_paral*(cosine-1) + sine*(u_perp1*cosphi + u_perp2*sinphi);
-    if (recoil) x_new += 2.6e-4 * sqrt(1e4/T_local) * (cosine - 1);
+    // dot product of (dimensionless) velocity and new direction
+    double u_dot_k = new_dir_x*u_bulk_x + new_dir_y*u_bulk_y + new_dir_z*u_bulk_z;
+    xlocal        += u_dot_k + u_paral*(cosine-1) + sine*(u_perp1*cosphi + u_perp2*sinphi);
+    if (recoil) xlocal += 2.6e-4 * sqrt(1e4/T_local) * (cosine - 1);
 
     // calculate momentum transfer in radial direction
     // p_photon = (h*nu/c) * direction
@@ -302,33 +298,17 @@ double scatter(Photon& phot, int ix, int iy, int iz, mt19937_64& rng,
         r_hat_z = phot.pos_z / r_mag;
     }
 
-    // compute photon frequencies (convert from Doppler units to actual frequency)
-    // nu = nu_alpha * sqrt(T_local/T_ref) * (1 + x * vth/c) where T_ref = 1e4 K
-    double temp_factor = sqrt(phot.local_temp / 1e4);
+    // -- faster approximate radial momentum (neglects O(vth/c) frequency term) --
+    double A = (h * nu_alpha / c) * sqrt(T_local / 1e4);
 
-    double nu_in = nu_alpha * temp_factor * (1.0 + phot.x * vth / c);
-    double nu_out = nu_alpha * temp_factor * (1.0 + x_new * vth / c);
+    double dir_dot_r     = phot.dir_x * r_hat_x + phot.dir_y * r_hat_y + phot.dir_z * r_hat_z;
+    double new_dir_dot_r = new_dir_x * r_hat_x + new_dir_y * r_hat_y + new_dir_z * r_hat_z;
 
-    // momentum before scatter: p_in = (h*nu_in/c) * dir_old
-    double p_in_x = (h * nu_in / c) * phot.dir_x;
-    double p_in_y = (h * nu_in / c) * phot.dir_y;
-    double p_in_z = (h * nu_in / c) * phot.dir_z;
-
-    // momentum after scatter: p_out = (h*nu_out/c) * dir_new
-    double p_out_x = (h * nu_out / c) * new_dir_x;
-    double p_out_y = (h * nu_out / c) * new_dir_y;
-    double p_out_z = (h * nu_out / c) * new_dir_z;
-
-    // momentum transferred to gas (positive = outward momentum to gas)
-    double dpx = p_in_x - p_out_x;
-    double dpy = p_in_y - p_out_y;
-    double dpz = p_in_z - p_out_z;
-
-    // radial component: dp_r = dp . r_hat
-    double dp_r = dpx*r_hat_x + dpy*r_hat_y + dpz*r_hat_z;
+    // dp_r ≈ A * (dir·r_hat - new_dir·r_hat)
+    double dp_r = A * (dir_dot_r - new_dir_dot_r);
 
     // change frequency and direction
-    phot.x     = x_new;
+    phot.x     = xlocal;
     phot.dir_x = new_dir_x;
     phot.dir_y = new_dir_y;
     phot.dir_z = new_dir_z;
