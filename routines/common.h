@@ -137,8 +137,8 @@ double voigt(double x, int T);
 void get_cell_indices(Photon& phot, int& ix, int& iy, int& iz);
 
 // initialize photon object
-void init_photon(Photon& phot, mt19937_64& rng, 
-                 uniform_real_distribution<double>& uni, bool phi_symmetry);
+void init_photon(Photon& phot, std::mt19937_64& rng, 
+                 std::uniform_real_distribution<double>& uni, bool phi_symmetry);
 
 // escaped: returns whether photon has escaped from simulation box
 bool escaped(Photon& phot);
