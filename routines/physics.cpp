@@ -11,7 +11,7 @@ using namespace std;
 
 // init_photon(): takes Photon, rng objects
 // sets position, direction of photon
-void init_photon(Photon& phot, mt19937_64& rng, 
+void init_photon(Photon& phot, xso::rng& rng, 
                  uniform_real_distribution<double>& uni, bool phi_symmetry) {
 
     phot.x = 0, phot.pos_x = 0, phot.pos_y = 0, phot.pos_z = 0;
@@ -171,7 +171,7 @@ void tau_to_s(double tau_target, Photon& phot) {
 
 // u_parallel(): takes photon, rng objects, returns parallel atom velocity
 // uses rejection method / CDF table / gaussian based on |x| regime
-double u_parallel(double x_local, double T_local, mt19937_64& rng,
+double u_parallel(double x_local, double T_local, xso::rng& rng,
     normal_distribution<double>& norm, uniform_real_distribution<double>& uni) {
     double x_abs = fabs(x_local);
 
@@ -221,7 +221,7 @@ double u_parallel(double x_local, double T_local, mt19937_64& rng,
 
 // scatter_mu(): takes photon, rng
 // returns mu = cos(theta) (scattering angle) from RASCAS distribution
-double scatter_mu(double x_local, mt19937_64& rng, uniform_real_distribution<double>& uni) {
+double scatter_mu(double x_local, xso::rng& rng, uniform_real_distribution<double>& uni) {
     double r = uni(rng);
     double A, B;
 
@@ -242,7 +242,7 @@ double scatter_mu(double x_local, mt19937_64& rng, uniform_real_distribution<dou
 // scatter(): takes photon, cell indices, radial momentum accumulator
 // changes x, direction by scattering
 // returns radial momentum transfer dp_r (positive = outward momentum to gas)
-double scatter(Photon& phot, int ix, int iy, int iz, mt19937_64& rng,
+double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     normal_distribution<double>& norm, uniform_real_distribution<double>& uni, 
     bool recoil, bool phi_symmetry) {
 

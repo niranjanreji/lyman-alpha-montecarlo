@@ -37,7 +37,7 @@ void monte_carlo(int max_photon_count, bool recoil, bool phi_symmetry) {
         int tid = omp_get_thread_num();
 
         // thread local rngs, local momentum bins
-        mt19937_64 rng_local(base_seed + (unsigned)tid * 9973u);
+        xso::rng rng_local(base_seed + (unsigned)tid * 9973u);
         uniform_real_distribution<double> uni(1e-12,1.0 - 1e-12);
         normal_distribution<double> n;
         vector<double> local_bins(nbins, 0.0);
