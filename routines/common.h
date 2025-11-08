@@ -99,6 +99,9 @@ struct Photon {
     double dir_x, dir_y, dir_z;
     double pos_x, pos_y, pos_z;
 
+    // phi value (used when azimuthal symmetry exists)
+    double phi;
+
     // photon frequency
     double x;
 
@@ -133,6 +136,10 @@ double voigt(double x, int T);
 // get_cell_indices: fast index lookup for uniform grid
 void get_cell_indices(Photon& phot, int& ix, int& iy, int& iz);
 
+// initialize photon object
+void init_photon(Photon& phot, mt19937_64& rng, 
+                 uniform_real_distribution<double>& uni, bool phi_symmetry);
+
 // escaped: returns whether photon has escaped from simulation box
 bool escaped(Photon& phot);
 
@@ -150,9 +157,9 @@ double scatter_mu(double x_local,
 double scatter(Photon& phot, int ix, int iy, int iz, std::mt19937_64& rng,
                std::normal_distribution<double>& norm,
                std::uniform_real_distribution<double>& uni,
-               bool recoil = true);
+               bool recoil = true, bool phi_symmetry = false);
 
 // Monte Carlo simulation
-void monte_carlo(int max_photon_count = 100000, bool recoil = true);
+void monte_carlo(int max_photon_count = 100000, bool recoil = true, bool phi_symmetry = false);
 
 #endif // COMMON_H

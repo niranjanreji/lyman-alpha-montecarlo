@@ -22,7 +22,8 @@ using namespace std;
 int main(int argc, char* argv[]) {
     // default parameters
     int n_photons = 100000;
-    bool recoil = true;
+    bool recoil  = true;
+    bool phi_sym = false;
     string cdf_table_path = "input/cdf_tables.h5";
     string grid_path = "input/grid.h5";
 
@@ -33,6 +34,10 @@ int main(int argc, char* argv[]) {
             if (i + 1 < argc) {
                 n_photons = atoi(argv[++i]);
             }
+        }
+        else if (arg == "--no-phi")
+        {
+            phi_sym = true;
         }
         else if (arg == "--no-recoil") {
             recoil = false;
@@ -52,6 +57,7 @@ int main(int argc, char* argv[]) {
             cout << "Options:\n";
             cout << "  -n, --photons N       Number of photons to simulate (default: 100000)\n";
             cout << "  --no-recoil           Disable recoil effect\n";
+            cout << "  --no-phi              System is symmetric w.r.t phi\n";
             cout << "  --cdf-table PATH      Path to CDF table HDF5 file (default: input/cdf_table.h5)\n";
             cout << "  --grid PATH           Path to grid HDF5 file (default: input/grid.h5)\n";
             cout << "  -h, --help            Show this help message\n";
@@ -89,7 +95,7 @@ int main(int argc, char* argv[]) {
 
     // run Monte Carlo simulation
     cout << "\nStarting Monte Carlo simulation...\n";
-    monte_carlo(n_photons, recoil);
+    monte_carlo(n_photons, recoil, phi_sym);
 
     cout << "\nSimulation complete!\n";
     return 0;

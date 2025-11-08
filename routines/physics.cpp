@@ -9,6 +9,36 @@ PHYSICS.CPP / NIRANJAN REJI
 #include "common.h"
 using namespace std;
 
+// init_photon(): takes Photon, rng objects
+// sets position, direction of photon
+void init_photon(Photon& phot, mt19937_64& rng, 
+                 uniform_real_distribution<double>& uni, bool phi_symmetry) {
+
+    phot.x = 0, phot.pos_x = 0, phot.pos_y = 0, phot.pos_z = 0;
+    if (phi_symmetry)
+    {
+        double cosine = uni(rng)*2.0 - 1.0;
+        double sine   = sqrt(1.0 - cosine*cosine);
+        double phi    = uni(rng)*2.0*pi;
+
+        phot.dir_x = sine*cos(phi);
+        phot.dir_y = sine*sin(phi);
+        phot.dir_z = cos(phi);
+        phot.phi = phi;
+    }
+    else
+    {
+        double dir_x = uni(rng)*2.0 - 1.0;
+        double dir_y = uni(rng)*2.0 - 1.0;
+        double dir_z = uni(rng)*2.0 - 1.0;
+
+        double dir_mag = sqrt(dir_x*dir_x + dir_y*dir_y + dir_z*dir_z);
+        phot.dir_x = dir_x / dir_mag;
+        phot.dir_y = dir_y / dir_mag;
+        phot.dir_z = dir_z / dir_mag;
+    }
+}
+
 // voigt(x, T): takes temperature T, doppler frequency x
 // returns H(x, T). uses approximation from COLT (2015)
 inline double voigt(double x, int T) {
@@ -222,7 +252,8 @@ double scatter_mu(double x_local, mt19937_64& rng, uniform_real_distribution<dou
 // changes x, direction by scattering
 // returns radial momentum transfer dp_r (positive = outward momentum to gas)
 double scatter(Photon& phot, int ix, int iy, int iz, mt19937_64& rng,
-    normal_distribution<double>& norm, uniform_real_distribution<double>& uni, bool recoil) {
+    normal_distribution<double>& norm, uniform_real_distribution<double>& uni, 
+    bool recoil, bool phi_symmetry) {
 
     int T_local    = g_grid.temp(ix, iy, iz);
     double vth     = vth_const * sqrt(T_local);
@@ -267,7 +298,9 @@ double scatter(Photon& phot, int ix, int iy, int iz, mt19937_64& rng,
     double sine = sqrt(1.0 - cosine*cosine);
 
     // pick new direction
-    double phi = uni(rng) * 2 * pi;
+    double phi;
+    if (phi_symmetry) phi = phot.phi;
+    else double phi = uni(rng) * 2 * pi;
     double cosphi = cos(phi), sinphi = sin(phi);
 
     // generate new direction vector
