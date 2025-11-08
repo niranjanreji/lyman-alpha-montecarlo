@@ -23,7 +23,7 @@ void init_photon(Photon& phot, mt19937_64& rng,
 
         phot.dir_x = sine*cos(phi);
         phot.dir_y = sine*sin(phi);
-        phot.dir_z = cos(phi);
+        phot.dir_z = cosine;
         phot.phi = phi;
     }
     else
@@ -300,7 +300,7 @@ double scatter(Photon& phot, int ix, int iy, int iz, mt19937_64& rng,
     // pick new direction
     double phi;
     if (phi_symmetry) phi = phot.phi;
-    else double phi = uni(rng) * 2 * pi;
+    else phi = uni(rng) * 2 * pi;
     double cosphi = cos(phi), sinphi = sin(phi);
 
     // generate new direction vector
