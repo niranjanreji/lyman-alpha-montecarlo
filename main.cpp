@@ -69,18 +69,6 @@ int main(int argc, char* argv[]) {
     cout << "Photons: " << n_photons << "\n";
     cout << "Recoil: " << (recoil ? "enabled" : "disabled") << "\n\n";
 
-    // load CDF table
-    cout << "Loading CDF table from " << cdf_table_path << "...\n";
-    try {
-        load_table(cdf_table_path);
-        cout << "  x grid: " << g_table.nx << " points\n";
-        cout << "  T grid: " << g_table.nT << " points\n";
-        cout << "  z grid: " << g_table.nz << " points\n";
-    } catch (const exception& e) {
-        cerr << "Error loading CDF table: " << e.what() << "\n";
-        return 1;
-    }
-
     // load grid
     cout << "Loading grid from " << grid_path << "...\n";
     try {

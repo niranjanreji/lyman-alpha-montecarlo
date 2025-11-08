@@ -42,16 +42,6 @@ constexpr double B8 = 1.82106170570;
 
 // ========== STRUCTURES ==========
 
-// CDF lookup table structure
-struct CDFTable {
-    std::vector<double> x, T, z, cdf;
-    int nx, nT, nz;
-    double eps;
-    inline double at(int ix, int iT, int iz) const {
-        return cdf[ix*nT*nz + iT*nz + iz];
-    }
-};
-
 // 3D grid structure
 struct Grid3D {
     // Grid dimensions
@@ -112,16 +102,9 @@ struct Photon {
     int local_temp;
 };
 
-// ========== GLOBAL VARIABLES ==========
-
-extern CDFTable g_table;
 extern Grid3D g_grid;
 
 // ========== FUNCTION DECLARATIONS ==========
-
-// CDF table functions
-void load_table(const std::string& path);
-double sample_cdf(double x_abs, double T, double r);
 
 // Grid functions
 void load_grid(const std::string& path);

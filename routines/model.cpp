@@ -10,11 +10,10 @@ MODEL.CPP / NIRANJAN REJI
 using namespace std;
 using namespace H5;
 
-// ========== GLOBAL VARIABLE DEFINITIONS ==========
-CDFTable g_table;
+
 Grid3D g_grid;
 
-// ========== CDF TABLE GLOBALS ==========
+// ========== 3D GRID GLOBALS ==========
 
 // Helper function to read 1D datasets
 void read_1d(H5File& f, const char* name, vector<double>& v, int& n, 
@@ -26,96 +25,6 @@ void read_1d(H5File& f, const char* name, vector<double>& v, int& n,
     v.resize(dim);
     ds.read(v.data(), dtype);
 }
-
-// Load CDF lookup table from HDF5 file. By default,
-// File contains: x grid (1200 pts), T grid (25 pts), z grid (4600 pts), and 3D CDF table
-void load_table(const string& path) {
-    H5File f(path, H5F_ACC_RDONLY);
-
-    // Read coordinate grids
-    read_1d(f, "x", g_table.x, g_table.nx);    // Frequency offset grid
-    read_1d(f, "T", g_table.T, g_table.nT);    // Temperature grid (log-spaced)
-    read_1d(f, "z", g_table.z, g_table.nz);    // Shifted coordinate z = u - x
-
-    // Read 3D CDF table [nx, nT, nz]
-    DataSet cdf_ds = f.openDataSet("cdf_table");
-    hsize_t dims[3];
-    cdf_ds.getSpace().getSimpleExtentDims(dims);
-    g_table.cdf.resize(dims[0] * dims[1] * dims[2]);
-    cdf_ds.read(g_table.cdf.data(), PredType::NATIVE_DOUBLE);
-
-    // Table is accurate for r in [0.001, 0.999]
-    g_table.eps = 0.001;
-    f.close();
-}
-    
-// Fast PCHIP invert CDF (monotonic cubic) - optimized for repeated calls
-inline double pchip_invert(const vector<double>& cdf, const vector<double>& z, double r) {
-    // Binary search for interval
-    int i = lower_bound(cdf.begin(), cdf.end(), r) - cdf.begin() - 1;
-    i = max(0, min(i, (int)cdf.size() - 2));
-
-    double h = z[i+1] - z[i];
-    double delta_cdf = cdf[i+1] - cdf[i];
-    double d0 = 0.0, d1 = 0.0;
-
-    if (i > 0 && i+2 < cdf.size()) {
-        double h_prev = z[i] - z[i-1];
-        double h_next = z[i+2] - z[i+1];
-        double s_prev = (cdf[i] - cdf[i-1]) / h_prev;
-        double s_curr = delta_cdf / h;
-        double s_next = (cdf[i+2] - cdf[i+1]) / h_next;
-
-        // Monotonic derivative at i
-        if (s_prev * s_curr > 0.0) d0 = 0.5 * (s_prev + s_curr);
-        // Monotonic derivative at i+1
-        if (s_curr * s_next > 0.0) d1 = 0.5 * (s_curr + s_next);
-    }
-
-    // Hermite interpolation
-    double t = (r - cdf[i]) / delta_cdf;
-    double t2 = t * t;
-    double t3 = t2 * t;
-
-    // Optimized Hermite basis evaluation
-    return z[i] + t * (h * d0 + t * (3.0*h - 2.0*h*d0 - h*d1 + t * (h*d0 + h*d1 - 2.0*h)));
-}
-
-// Bilinear + PCHIP inversion
-double sample_cdf(double x_abs, double T, double r) {
-    int ix = lower_bound(g_table.x.begin(), g_table.x.end(), x_abs) - g_table.x.begin() - 1;
-    ix = max(0, min(ix, g_table.nx - 2));
-
-    int iT = lower_bound(g_table.T.begin(), g_table.T.end(), T) - g_table.T.begin() - 1;
-    iT = max(0, min(iT, g_table.nT - 2));
-
-    double wx = (x_abs - g_table.x[ix]) / (g_table.x[ix+1] - g_table.x[ix]);
-    double wT = (T - g_table.T[iT]) / (g_table.T[iT+1] - g_table.T[iT]);
-
-    // Thread-local buffer to avoid repeated malloc
-    thread_local vector<double> cdf_interp(g_table.nz);
-
-    // Precompute bilinear weights
-    const double w00 = (1.0 - wx) * (1.0 - wT);
-    const double w10 = wx * (1.0 - wT);
-    const double w01 = (1.0 - wx) * wT;
-    const double w11 = wx * wT;
-
-    for (int iz = 0; iz < g_table.nz; ++iz) {
-        double c00 = g_table.at(ix, iT, iz);
-        double c10 = g_table.at(ix+1, iT, iz);
-        double c01 = g_table.at(ix, iT+1, iz);
-        double c11 = g_table.at(ix+1, iT+1, iz);
-        cdf_interp[iz] = w00*c00 + w10*c10 + w01*c01 + w11*c11;
-    }
-
-    double z_val = pchip_invert(cdf_interp, g_table.z, r);
-    return z_val + x_abs;   // u = z + x
-}
-
-// ========== END CDF TABLE ============
-
-// ========== 3D GRID GLOBALS ==========
 
 // Helper function to read 1D scalar
 template<typename T>

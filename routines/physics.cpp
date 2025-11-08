@@ -179,7 +179,8 @@ double u_parallel(double x_local, double T_local, mt19937_64& rng,
     if (x_abs >= 8.0) return (1.0/x_local) + (1.0/sqrt(2.0))*norm(rng);
 
     // core approximated using rejection sampling
-    if (x_abs < 1.0)
+    //if (x_abs < 1.0)
+    else
     {
         double a    = a_(T_local);
         double zeta = log10(a); 
@@ -215,16 +216,6 @@ double u_parallel(double x_local, double T_local, mt19937_64& rng,
             if ((R1 <= p) && (R2 <= exp(-u*u))) return u;
             if ((R1 > p) && (R2 <= exp(u02 - u*u))) return u;
         }
-    }
-
-    // cdf table within 1 <= x < 8 region for speed
-    while (true)
-    {
-        double r = uni(rng);
-        if (r < g_table.eps || r > 1.0 - g_table.eps) continue;
-
-        double u_abs   = sample_cdf(x_abs, T_local, r);
-        return (x_local < 0.0) ? -u_abs : u_abs;
     }
 }
 
