@@ -53,8 +53,8 @@ void init_photon(Photon& phot, xso::rng& rng, bool phi_symmetry) {
 
 // voigt(x, T): takes temperature T, doppler frequency x
 // returns H(x, T). uses approximation from COLT (2015)
-inline double voigt(double x, int T) {
-    double a = a_(T);
+inline double voigt(double x, int sqrt_T) {
+    double a = a_const / sqrt_T;
     double H = 0;
     double z = x*x;
 
@@ -116,7 +116,7 @@ void tau_to_s(double tau_target, Photon& phot) {
     double tau_accumulated = 0.0;
 
     // define variables outside loop
-    int ix, iy, iz, T_local;
+    int ix, iy, iz, sqrt_T_local;
     double n_HI, vx_bulk, vy_bulk, vz_bulk, t_boundary, dir_dot_v, x_local, sigma_alpha, dtau, s, inv_sqrt_T;
     while (tau_accumulated < tau_target)
     {
@@ -131,8 +131,8 @@ void tau_to_s(double tau_target, Photon& phot) {
         iz = min(iz, g_grid.nz - 1);
 
         // get local cell properties
-        T_local    = g_grid.temp(ix, iy, iz);
-        inv_sqrt_T = (1.0 / sqrt(T_local)); 
+        sqrt_T_local = g_grid.sqrt_temp(ix, iy, iz);
+        inv_sqrt_T   = 1.0 / sqrt_T_local; 
         n_HI    = g_grid.hi(ix, iy, iz);
         vx_bulk = g_grid.velx(ix, iy, iz);
         vy_bulk = g_grid.vely(ix, iy, iz);
@@ -153,13 +153,13 @@ void tau_to_s(double tau_target, Photon& phot) {
         }
 
         // find change in x due to local temperature
-        phot.x          = phot.x * sqrt(phot.local_temp) * inv_sqrt_T;
-        phot.local_temp = T_local;
+        phot.x               = phot.x * phot.local_sqrt_temp * inv_sqrt_T;
+        phot.local_sqrt_temp = sqrt_T_local;
 
         // find local x due to bulk velocity
         dir_dot_v   = vx_bulk*phot.dir_x + vy_bulk*phot.dir_y + vz_bulk*phot.dir_z;
         x_local     = phot.x - (dir_dot_v * inv_sqrt_T) / (vth_const);
-        sigma_alpha = 5.898e-14 * 1e2 * inv_sqrt_T * voigt(x_local, T_local);
+        sigma_alpha = 5.898e-14 * 1e2 * inv_sqrt_T * voigt(x_local, sqrt_T_local);
 
         // increment tau
         dtau = n_HI * sigma_alpha * (t_boundary + eps);
@@ -185,7 +185,7 @@ void tau_to_s(double tau_target, Photon& phot) {
 
 // u_parallel(): takes photon, rng objects, returns parallel atom velocity
 // uses rejection method / CDF table / gaussian based on |x| regime
-double u_parallel(double x_local, double T_local, xso::rng& rng) {
+double u_parallel(double x_local, double sqrt_T_local, xso::rng& rng) {
     double x_abs = fabs(x_local);
 
     // x > 8 regime approximated by gaussian
@@ -207,7 +207,7 @@ double u_parallel(double x_local, double T_local, xso::rng& rng) {
     //if (x_abs < 1.0)
     else
     {
-        double a    = a_(T_local);
+        double a    = a_const / sqrt_T_local;
         double zeta = log10(a); 
 
         double x2 = x_local * x_local;
@@ -286,19 +286,18 @@ double scatter_mu(double x_local, xso::rng& rng) {
 double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     bool recoil, bool phi_symmetry) {
 
-    int T_local    = g_grid.temp(ix, iy, iz);
-    double vth     = vth_const * sqrt(T_local);
-
-    double u_bulk_x = g_grid.velx(ix, iy, iz) / vth;
-    double u_bulk_y = g_grid.vely(ix, iy, iz) / vth;
-    double u_bulk_z = g_grid.velz(ix, iy, iz) / vth;
+    int sqrt_T_local = g_grid.sqrt_temp(ix, iy, iz);
+    double vth       = vth_const * sqrt_T_local;
+    double u_bulk_x  = g_grid.velx(ix, iy, iz) / vth;
+    double u_bulk_y  = g_grid.vely(ix, iy, iz) / vth;
+    double u_bulk_z  = g_grid.velz(ix, iy, iz) / vth;
     
     // shift photon x value to local frame
     double dirdotv  = u_bulk_x*phot.dir_x + u_bulk_y*phot.dir_y + u_bulk_z*phot.dir_z;
     double xlocal   = phot.x - dirdotv;
     
     // generate velocity components of scattering atom
-    double u_paral = u_parallel(xlocal, T_local, rng);
+    double u_paral = u_parallel(xlocal, sqrt_T_local, rng);
     
     // parallel components - sample normal using box-muller
     uint64_t r1 = rng(); uint64_t r2 = rng();
@@ -308,13 +307,13 @@ double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     if (u1 < 1e-16) u1 = 1e-16;
     
     double R = sqrt(-2.0*log(u1));
-    double theta = 2.0*pi*u2;
+    double theta = two_pi*u2;
 
     double z1 = R*cos(theta);
     double z2 = R*sin(theta);
 
-    double u_perp1 = sqrt(1.0/2.0)*z1;
-    double u_perp2 = sqrt(1.0/2.0)*z2;
+    double u_perp1 = sqrt_1_2*z1;
+    double u_perp2 = sqrt_1_2*z2;
 
     // find basis that velocity components are in
     // a = random vector to cross with phot.dir
@@ -322,8 +321,8 @@ double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     double ay    = (ax != 0.0) ? 0.0 : 1.0;
 
     // basis vector 2 (phot.dir = basis vector 1)
-    double e1x = ((phot.dir_y*0) - (phot.dir_z*ay));
-    double e1y = ((phot.dir_z*ax) - (phot.dir_x*0));
+    double e1x = (-phot.dir_z*ay);
+    double e1y = (phot.dir_z*ax);
     double e1z = ((phot.dir_x*ay) - (phot.dir_y*ax));
 
     // normalize e1
@@ -363,7 +362,7 @@ double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     // dot product of (dimensionless) velocity and new direction
     double u_dot_k = new_dir_x*u_bulk_x + new_dir_y*u_bulk_y + new_dir_z*u_bulk_z;
     xlocal        += u_dot_k + u_paral*(cosine-1) + sine*(u_perp1*cosphi + u_perp2*sinphi);
-    if (recoil) xlocal += 2.6e-4 * sqrt(1e4/T_local) * (cosine - 1);
+    if (recoil) xlocal += 2.6e-4 * (1e2 / sqrt_T_local) * (cosine - 1);
 
     // calculate momentum transfer in radial direction
     // p_photon = (h*nu/c) * direction
@@ -380,7 +379,7 @@ double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     }
 
     // -- faster approximate radial momentum (neglects O(vth/c) frequency term) --
-    double A = (h * nu_alpha / c) * sqrt(T_local / 1e4);
+    double A = hnualphabyc * (sqrt_T_local / 1e2);
 
     double dir_dot_r     = phot.dir_x * r_hat_x + phot.dir_y * r_hat_y + phot.dir_z * r_hat_z;
     double new_dir_dot_r = new_dir_x * r_hat_x + new_dir_y * r_hat_y + new_dir_z * r_hat_z;

@@ -60,6 +60,10 @@ def create_3d_grid():
     T_grid = np.zeros((nx, ny, nz))
     T_grid[:, :, :] = 1e4
 
+    # Since it's so numerically useful, create a 3D sqrt(T) array
+    sqrt_T_grid = np.zeros((nx, ny, nz))
+    sqrt_T_grid[:,:,:] = 1e2
+
     # Create a 3D HI number density array
     print(f" HI number densities are set to represent a uniform sphere. Modify HI_grid to change this")
     HI_grid = np.zeros((nx, ny, nz))
@@ -111,6 +115,7 @@ def create_3d_grid():
 
         # Temperature, Densities, Velocity Field
         f.create_dataset('T', data=T_grid, dtype='u4')
+        f.create_dataset('sqrt_T', data=sqrt_T_grid, dtype='u4')
         f.create_dataset('HI', data=HI_grid)
         f.create_dataset('vx', data=vx_grid)
         f.create_dataset('vy', data=vy_grid)

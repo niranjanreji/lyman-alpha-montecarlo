@@ -11,15 +11,16 @@
 
 // ========== PHYSICAL CONSTANTS ==========
 
-static const double pi        = M_PI;
-static const double k         = 1.380649e-16;
-static const double c         = 29979245800.0;
-static const double h         = 6.62607015e-27;
-static const double m_p       = 1.67262192595e-24;
-static const double A_alpha   = 6.265e8;
-static const double nu_alpha  = 2.466e15;
-static const double vth_const = sqrt((2.0*k) / m_p);
-static const double a_const   = (A_alpha*c) / (4.0*pi*nu_alpha) / vth_const;
+static const double pi          = M_PI;
+static const double k           = 1.380649e-16;
+static const double c           = 29979245800.0;
+static const double h           = 6.62607015e-27;
+static const double m_p         = 1.67262192595e-24;
+static const double A_alpha     = 6.265e8;
+static const double nu_alpha    = 2.466e15;
+static const double vth_const   = sqrt((2.0*k) / m_p);
+static const double a_const     = (A_alpha*c) / (4.0*pi*nu_alpha) / vth_const;
+static const double hnualphabyc = (h * nu_alpha)/c;
 
 // Approximation taken from Smith et al (2015)
 // ========== VOIGT APPROXIMATION CONSTANTS ==========
@@ -44,7 +45,9 @@ constexpr double B8 = 1.82106170570;
 
 // ========== OTHER CONSTS ========
 
-constexpr double rng_const = 1.0/9007199254740992.0;
+constexpr double rng_const   = 1.0/9007199254740992.0;
+static const double sqrt_1_2 = sqrt(1.0/2.0);
+static const double two_pi = 2.0*pi;
 
 // ========== STRUCTURES ==========
 
@@ -67,11 +70,15 @@ struct Grid3D {
 
     // Physical fields (3D arrays flattened to 1D)
     std::vector<int> T;            // Temperature [K]
+    std::vector<int> sqrt_T;       // Sqrt Temp [K^0.5]
     std::vector<double> HI;        // HI number density [cm^-3]
     std::vector<double> vx;        // Bulk velocity [cm/s]
     std::vector<double> vy;
     std::vector<double> vz;
 
+    inline int sqrt_temp(int ix, int iy, int iz) const {
+        return sqrt_T[ix*ny*nz + iy*nz + iz];
+    }
     inline int temp(int ix, int iy, int iz) const {
         return T[ix*ny*nz + iy*nz + iz];
     }
@@ -105,7 +112,7 @@ struct Photon {
     int curr_i, curr_j, curr_k;
 
     // temperature where x is valid
-    int local_temp;
+    int local_sqrt_temp;
 };
 
 extern Grid3D g_grid;
@@ -115,12 +122,7 @@ extern Grid3D g_grid;
 // Grid functions
 void load_grid(const std::string& path);
 
-// Physics functions
-inline double a_(int T) {
-    return a_const / std::sqrt(T);
-}
-
-double voigt(double x, int T);
+double voigt(double x, int sqrt_T);
 
 // get_cell_indices: fast index lookup for uniform grid
 void get_cell_indices(Photon& phot, int& ix, int& iy, int& iz);
@@ -134,7 +136,7 @@ bool escaped(Photon& phot);
 double compute_t_to_boundary(Photon& phot, int ix, int iy, int iz);
 void tau_to_s(double tau_target, Photon& phot);
 
-double u_parallel(double x_local, double T_local, xso::rng& rng);
+double u_parallel(double x_local, double sqrt_T_local, xso::rng& rng);
 
 double scatter_mu(double x_local, xso::rng& rng);
 

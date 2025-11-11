@@ -74,6 +74,7 @@ void load_grid(const string& path) {
     
     // Read 3D physical fields
     read_3d(f, "T", g_grid.T, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_INT);
+    read_3d(f, "sqrt_T", g_grid.sqrt_T, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_INT);
     read_3d(f, "HI", g_grid.HI, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_DOUBLE);
     read_3d(f, "vx", g_grid.vx, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_DOUBLE);
     read_3d(f, "vy", g_grid.vy, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_DOUBLE);

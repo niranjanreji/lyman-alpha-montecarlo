@@ -49,15 +49,19 @@ void monte_carlo(int max_photon_count, bool recoil, bool phi_symmetry) {
             // initialize local cell temperature for photon
             int ix, iy, iz;
             get_cell_indices(phot, ix, iy, iz);
-            phot.local_temp = g_grid.temp(ix, iy, iz);
-
+            phot.local_sqrt_temp = g_grid.sqrt_temp(ix, iy, iz);
             int n_scatters = 0;
+
+            // pre-allocate mem for while loop variables
+            uint64_t R;
+            double r, tau, dp_r, r_scatter;
+            int T_local, bin_idx;
             while (!escaped(phot))
             {
                 // draw random optical depth
-                uint64_t R = rng_local();
-                double r   = double(R >> 11) / 9007199254740992.0;
-                double tau = -log(r);
+                R   = rng_local();
+                r   = double(R >> 11) * rng_const;
+                tau = -log(r);
 
                 // update photon position
                 tau_to_s(tau, phot);
@@ -65,29 +69,26 @@ void monte_carlo(int max_photon_count, bool recoil, bool phi_symmetry) {
                 if (escaped(phot))
                 {
                     // shift x to standard temperature scale
-                    phot.x *= sqrt(phot.local_temp / 1e4);
+                    phot.x *= phot.local_sqrt_temp/1e2;
                     break;
                 }
 
                 // find current cell indices
-                int ix, iy, iz;
                 get_cell_indices(phot, ix, iy, iz);
 
                 // clamp to valid values for safety
-                ix = max(0, min(ix, g_grid.nx - 1));
-                iy = max(0, min(iy, g_grid.ny - 1));
-                iz = max(0, min(iz, g_grid.nz - 1));
-
-                int T_local = g_grid.temp(ix, iy, iz);
+                ix = min(ix, g_grid.nx - 1);
+                iy = min(iy, g_grid.ny - 1);
+                iz = min(iz, g_grid.nz - 1);
 
                 // scatter the photon and get radial momentum transfer
-                double dp_r = scatter(phot, ix, iy, iz, rng_local, recoil, phi_symmetry);
+                dp_r = scatter(phot, ix, iy, iz, rng_local, recoil, phi_symmetry);
 
                 n_scatters++;
 
                 // bin the momentum by radial distance
-                double r_scatter = sqrt(phot.pos_x*phot.pos_x + phot.pos_y*phot.pos_y + phot.pos_z*phot.pos_z);
-                int bin_idx = (int)((r_scatter - rmin) / binw);
+                r_scatter = sqrt(phot.pos_x*phot.pos_x + phot.pos_y*phot.pos_y + phot.pos_z*phot.pos_z);
+                bin_idx = (int)((r_scatter - rmin) / binw);
                 if (bin_idx >= 0 && bin_idx < nbins) {
                     local_bins[bin_idx] += dp_r;
                 }
