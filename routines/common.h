@@ -121,8 +121,7 @@ double voigt(double x, int T);
 void get_cell_indices(Photon& phot, int& ix, int& iy, int& iz);
 
 // initialize photon object
-void init_photon(Photon& phot, xso::rng& rng, 
-                 std::uniform_real_distribution<double>& uni, bool phi_symmetry);
+void init_photon(Photon& phot, xso::rng& rng, bool phi_symmetry);
 
 // escaped: returns whether photon has escaped from simulation box
 bool escaped(Photon& phot);
@@ -130,17 +129,11 @@ bool escaped(Photon& phot);
 double compute_t_to_boundary(Photon& phot, int ix, int iy, int iz);
 void tau_to_s(double tau_target, Photon& phot);
 
-double u_parallel(double x_local, double T_local, xso::rng& rng,
-                  std::normal_distribution<double>& norm,
-                  std::uniform_real_distribution<double>& uni);
+double u_parallel(double x_local, double T_local, xso::rng& rng);
 
-double scatter_mu(double x_local,
-                  xso::rng& rng,
-                  std::uniform_real_distribution<double>& uni);
+double scatter_mu(double x_local, xso::rng& rng);
 
 double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
-               std::normal_distribution<double>& norm,
-               std::uniform_real_distribution<double>& uni,
                bool recoil = true, bool phi_symmetry = false);
 
 // Monte Carlo simulation

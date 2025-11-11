@@ -38,15 +38,13 @@ void monte_carlo(int max_photon_count, bool recoil, bool phi_symmetry) {
 
         // thread local rngs, local momentum bins
         xso::rng rng_local(base_seed + (unsigned)tid * 9973u);
-        uniform_real_distribution<double> uni(1e-12,1.0 - 1e-12);
-        normal_distribution<double> n;
         vector<double> local_bins(nbins, 0.0);
 
         #pragma omp for schedule(dynamic)
         for (int photon_idx = 0; photon_idx < max_photon_count; ++photon_idx)
         {
             Photon phot;
-            init_photon(phot, rng_local, uni, phi_symmetry);
+            init_photon(phot, rng_local, phi_symmetry);
 
             // initialize local cell temperature for photon
             int ix, iy, iz;
@@ -57,7 +55,8 @@ void monte_carlo(int max_photon_count, bool recoil, bool phi_symmetry) {
             while (!escaped(phot))
             {
                 // draw random optical depth
-                double r   = uni(rng_local);
+                uint64_t R = rng_local();
+                double r   = double(R >> 11) / 9007199254740992.0;
                 double tau = -log(r);
 
                 // update photon position
@@ -82,7 +81,7 @@ void monte_carlo(int max_photon_count, bool recoil, bool phi_symmetry) {
                 int T_local = g_grid.temp(ix, iy, iz);
 
                 // scatter the photon and get radial momentum transfer
-                double dp_r = scatter(phot, ix, iy, iz, rng_local, n, uni, recoil, phi_symmetry);
+                double dp_r = scatter(phot, ix, iy, iz, rng_local, recoil, phi_symmetry);
 
                 n_scatters++;
 

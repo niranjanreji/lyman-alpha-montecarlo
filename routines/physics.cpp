@@ -11,15 +11,20 @@ using namespace std;
 
 // init_photon(): takes Photon, rng objects
 // sets position, direction of photon
-void init_photon(Photon& phot, xso::rng& rng, 
-                 uniform_real_distribution<double>& uni, bool phi_symmetry) {
+void init_photon(Photon& phot, xso::rng& rng, bool phi_symmetry) {
 
     phot.x = 0, phot.pos_x = 0, phot.pos_y = 0, phot.pos_z = 0;
     if (phi_symmetry)
     {
-        double cosine = uni(rng)*2.0 - 1.0;
+        uint64_t r1 = rng(); uint64_t r2 = rng();
+
+        // shift by 11 bits, divide by max 53 bit val to convert to [0, 1) interval
+        double u1 = double(r1 >> 11) / 9007199254740992.0;
+        double u2 = double(r2 >> 11) / 9007199254740992.0;
+
+        double cosine = u1*2.0 - 1.0;
         double sine   = sqrt(1.0 - cosine*cosine);
-        double phi    = uni(rng)*2.0*pi;
+        double phi    = u2*2.0*pi;
 
         phot.dir_x = sine*cos(phi);
         phot.dir_y = sine*sin(phi);
@@ -28,9 +33,16 @@ void init_photon(Photon& phot, xso::rng& rng,
     }
     else
     {
-        double dir_x = uni(rng)*2.0 - 1.0;
-        double dir_y = uni(rng)*2.0 - 1.0;
-        double dir_z = uni(rng)*2.0 - 1.0;
+        uint64_t r1 = rng(); uint64_t r2 = rng(); uint64_t r3 = rng();
+
+        // shift by 11 bits, divide by max 53 bit val to convert to [0, 1) interval
+        double u1 = double(r1 >> 11) / 9007199254740992.0;
+        double u2 = double(r2 >> 11) / 9007199254740992.0;
+        double u3 = double(r3 >> 11) / 9007199254740992.0;
+
+        double dir_x = u1*2.0 - 1.0;
+        double dir_y = u2*2.0 - 1.0;
+        double dir_z = u3*2.0 - 1.0;
 
         double dir_mag = sqrt(dir_x*dir_x + dir_y*dir_y + dir_z*dir_z);
         phot.dir_x = dir_x / dir_mag;
@@ -172,12 +184,23 @@ void tau_to_s(double tau_target, Photon& phot) {
 
 // u_parallel(): takes photon, rng objects, returns parallel atom velocity
 // uses rejection method / CDF table / gaussian based on |x| regime
-double u_parallel(double x_local, double T_local, xso::rng& rng,
-    normal_distribution<double>& norm, uniform_real_distribution<double>& uni) {
+double u_parallel(double x_local, double T_local, xso::rng& rng) {
     double x_abs = fabs(x_local);
 
     // x > 8 regime approximated by gaussian
-    if (x_abs >= 8.0) return (1.0/x_local) + (1.0/sqrt(2.0))*norm(rng);
+    if (x_abs >= 8.0) 
+    {
+        // box-muller method
+        uint64_t r1 = rng(); uint64_t r2 = rng();
+
+        // shift by 11 bits, divide by max 53 bit val to convert to [0, 1) interval
+        double u1 = double(r1 >> 11) / 9007199254740992.0;
+        double u2 = double(r2 >> 11) / 9007199254740992.0;
+        if (u1 == 0) u1 = 1.0;
+
+        double z = sqrt(-2.0 * log(u1)) * cos(2.0*pi*u2);
+        return (1.0 / x_local) + (z / sqrt(2.0));
+    }
 
     // core approximated using rejection sampling
     //if (x_abs < 1.0)
@@ -204,16 +227,29 @@ double u_parallel(double x_local, double T_local, xso::rng& rng,
         double eu0 = exp(-u02);
         double p = (theta0 + pi/2)/( (1 - eu0)*theta0 + (1 + eu0)*pi/2 );
 
+        // pre-define variables for inner loop
+        double R1, theta, u, R2, r;
+        uint64_t R;
         while (true)
         {
-            double R1 = uni(rng);
-            double theta;
-            if (R1 <= p) theta = -pi/2 + uni(rng)*(theta0 - (-pi/2));
-            else theta = theta0 + uni(rng)*(pi/2 - theta0);
+            // draw univariate
+            R  = rng();
+            R1 = double(R >> 11) / 9007199254740992.0;
 
-            double u = a*tan(theta) + x_local;
+            R = rng();
+            r = double(R >> 11) / 9007199254740992.0;
+            // pick sampling regime
+            if (R1 <= p) theta = -pi/2 + r*(theta0 - (-pi/2));
+            else theta = theta0 + r*(pi/2 - theta0);
+
+            u = a*tan(theta) + x_local;
             if (!isfinite(u)) continue;
-            double R2 = uni(rng);
+
+            // draw second univariate
+            R  = rng();
+            R2 = double(R >> 11) / 9007199254740992.0;
+
+            // rejection method condition
             if ((R1 <= p) && (R2 <= exp(-u*u))) return u;
             if ((R1 > p) && (R2 <= exp(u02 - u*u))) return u;
         }
@@ -222,14 +258,17 @@ double u_parallel(double x_local, double T_local, xso::rng& rng,
 
 // scatter_mu(): takes photon, rng
 // returns mu = cos(theta) (scattering angle) from RASCAS distribution
-double scatter_mu(double x_local, xso::rng& rng, uniform_real_distribution<double>& uni) {
-    double r = uni(rng);
+double scatter_mu(double x_local, xso::rng& rng) {
+    // generate univariate
+    uint64_t r0 = rng();
+    double r    = double(r0 >> 11) / 9007199254740992.0;
+
     double A, B;
 
     if (fabs(x_local) < 0.2)
     {
         B = 6 * (2*r - 1);
-        A = sqrt(B*B + (11*11*11)/37.0);
+        A = sqrt(B*B + 35.972972972972973);
     }
     else
     {
@@ -237,14 +276,13 @@ double scatter_mu(double x_local, xso::rng& rng, uniform_real_distribution<doubl
         A = sqrt(B*B + 1);
     }
 
-    return pow(A+B, 1.0/3.0) - pow(A-B, 1.0/3.0);
+    return pow(A+B, 1/3) - pow(A-B, 1/3);
 }
 
 // scatter(): takes photon, cell indices, radial momentum accumulator
 // changes x, direction by scattering
 // returns radial momentum transfer dp_r (positive = outward momentum to gas)
 double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
-    normal_distribution<double>& norm, uniform_real_distribution<double>& uni, 
     bool recoil, bool phi_symmetry) {
 
     int T_local    = g_grid.temp(ix, iy, iz);
@@ -259,24 +297,36 @@ double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     double xlocal   = phot.x - dirdotv;
     
     // generate velocity components of scattering atom
-    double u_paral = u_parallel(xlocal, T_local, rng, norm, uni);
-    double u_perp1 = (1/sqrt(2)) * norm(rng);
-    double u_perp2 = (1/sqrt(2)) * norm(rng);
+    double u_paral = u_parallel(xlocal, T_local, rng);
+    
+    // parallel components - sample normal using box-muller
+    uint64_t r1 = rng(); uint64_t r2 = rng();
+
+    double u1 = double(r1 >> 11) / 9007199254740992.0;
+    double u2 = double(r2 >> 11) / 9007199254740992.0;
+    if (u1 < 1e-16) u1 = 1e-16;
+    
+    double R = sqrt(-2.0*log(u1));
+    double theta = 2.0*pi*u2;
+
+    double z1 = R*cos(theta);
+    double z2 = R*sin(theta);
+
+    double u_perp1 = sqrt(1.0/2.0)*z1;
+    double u_perp2 = sqrt(1.0/2.0)*z2;
 
     // find basis that velocity components are in
     // a = random vector to cross with phot.dir
     double ax    = (fabs(phot.dir_x) < 0.9) ? 1.0 : 0.0;
     double ay    = (ax != 0.0) ? 0.0 : 1.0;
-    double a_mag = 1;
 
     // basis vector 2 (phot.dir = basis vector 1)
-    double e1x = ((phot.dir_y*0) - (phot.dir_z*ay))/(a_mag);
-    double e1y = ((phot.dir_z*ax) - (phot.dir_x*0))/(a_mag);
-    double e1z = ((phot.dir_x*ay) - (phot.dir_y*ax))/(a_mag);
+    double e1x = ((phot.dir_y*0) - (phot.dir_z*ay));
+    double e1y = ((phot.dir_z*ax) - (phot.dir_x*0));
+    double e1z = ((phot.dir_x*ay) - (phot.dir_y*ax));
 
     // normalize e1
     double e1norm = sqrt(e1x*e1x + e1y*e1y + e1z*e1z);
-    if (e1norm < 1e-14) { e1x=0; e1y=1; e1z=0; e1norm=1; }
     e1x /= e1norm; e1y /= e1norm; e1z /= e1norm;
 
     // basis vector 3
@@ -285,14 +335,19 @@ double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     double e2z = ((phot.dir_x*e1y) - (phot.dir_y*e1x)); 
 
     // find scattering angle, clamp cosine to [-1, 1] to avoid numerical issues
-    double cosine = scatter_mu(xlocal, rng, uni);
+    double cosine = scatter_mu(xlocal, rng);
     cosine = max(-1.0, min(1.0, cosine));
     double sine = sqrt(1.0 - cosine*cosine);
+    
+    // draw univariate to sample phi
+    // (reusing old declarations as a micro-optimization)
+    r1 = rng();
+    u1 = double(r1 >> 11) / 9007199254740992.0;
 
     // pick new direction
     double phi;
     if (phi_symmetry) phi = phot.phi;
-    else phi = uni(rng) * 2 * pi;
+    else phi = u1 * 2 * pi;
     double cosphi = cos(phi), sinphi = sin(phi);
 
     // generate new direction vector
