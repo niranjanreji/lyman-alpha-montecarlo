@@ -105,7 +105,10 @@ inline double compute_t_to_boundary(Photon& phot, int ix, int iy, int iz) {
     else if (phot.dir_z < -1e-10) t_z = (g_grid.z_edges[iz] - phot.pos_z) / phot.dir_z;
 
     // return closest boundary, update cell indices
-    return min(t_x, min(t_y, t_z));
+    double t_min = t_x;
+    if (t_y < t_min) t_min = t_y;
+    if (t_z < t_min) t_min = t_z;
+    return t_min;
 }
 
 // tau_to_s(): takes tau, photon
@@ -131,12 +134,16 @@ void tau_to_s(double tau_target, Photon& phot) {
         iz = min(iz, g_grid.nz - 1);
 
         // get local cell properties
-        sqrt_T_local = g_grid.sqrt_temp(ix, iy, iz);
+        // avoiding using helpers to save some time and pre-calc index
+
+        const int cell_idx = ix*g_grid.ny*g_grid.nz + iy*g_grid.nz + iz;
+
+        n_HI         = g_grid.HI[cell_idx];
+        vx_bulk      = g_grid.vx[cell_idx];
+        vy_bulk      = g_grid.vy[cell_idx];
+        vz_bulk      = g_grid.vz[cell_idx];
+        sqrt_T_local = g_grid.sqrt_T[cell_idx];
         inv_sqrt_T   = 1.0 / sqrt_T_local; 
-        n_HI    = g_grid.hi(ix, iy, iz);
-        vx_bulk = g_grid.velx(ix, iy, iz);
-        vy_bulk = g_grid.vely(ix, iy, iz);
-        vz_bulk = g_grid.velz(ix, iy, iz);
 
         // find dist to next cell
         t_boundary = compute_t_to_boundary(phot, ix, iy, iz);
@@ -159,7 +166,7 @@ void tau_to_s(double tau_target, Photon& phot) {
         // find local x due to bulk velocity
         dir_dot_v   = vx_bulk*phot.dir_x + vy_bulk*phot.dir_y + vz_bulk*phot.dir_z;
         x_local     = phot.x - (dir_dot_v * inv_sqrt_T) / (vth_const);
-        sigma_alpha = 5.898e-14 * 1e2 * inv_sqrt_T * voigt(x_local, sqrt_T_local);
+        sigma_alpha = 5.898e-12 * inv_sqrt_T * voigt(x_local, sqrt_T_local);
 
         // increment tau
         dtau = n_HI * sigma_alpha * (t_boundary + eps);
@@ -200,7 +207,7 @@ double u_parallel(double x_local, double sqrt_T_local, xso::rng& rng) {
         if (u1 == 0) u1 = 1.0;
 
         double z = sqrt(-2.0 * log(u1)) * cos(2.0*pi*u2);
-        return (1.0 / x_local) + (z / sqrt(2.0));
+        return (1.0 / x_local) + (z * sqrt_1_2);
     }
 
     // core approximated using rejection sampling
@@ -325,9 +332,9 @@ double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     double e1y = (phot.dir_z*ax);
     double e1z = ((phot.dir_x*ay) - (phot.dir_y*ax));
 
-    // normalize e1
-    double e1norm = sqrt(e1x*e1x + e1y*e1y + e1z*e1z);
-    e1x /= e1norm; e1y /= e1norm; e1z /= e1norm;
+    // normalize e1 (use inverse for consistency and speed)
+    double inv_e1norm = 1.0 / sqrt(e1x*e1x + e1y*e1y + e1z*e1z);
+    e1x *= inv_e1norm; e1y *= inv_e1norm; e1z *= inv_e1norm;
 
     // basis vector 3
     double e2x = ((phot.dir_y*e1z) - (phot.dir_z*e1y));
@@ -373,9 +380,10 @@ double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     double r_hat_x = 0.0, r_hat_y = 0.0, r_hat_z = 0.0;
 
     if (r_mag > 1e-12) {
-        r_hat_x = phot.pos_x / r_mag;
-        r_hat_y = phot.pos_y / r_mag;
-        r_hat_z = phot.pos_z / r_mag;
+        double inv_r_mag = 1.0 / r_mag;  // One division
+        r_hat_x = phot.pos_x * inv_r_mag;  // Three multiplications (faster)
+        r_hat_y = phot.pos_y * inv_r_mag;
+        r_hat_z = phot.pos_z * inv_r_mag;
     }
 
     // -- faster approximate radial momentum (neglects O(vth/c) frequency term) --
