@@ -19,8 +19,8 @@ void init_photon(Photon& phot, xso::rng& rng, bool phi_symmetry) {
         uint64_t r1 = rng(); uint64_t r2 = rng();
 
         // shift by 11 bits, divide by max 53 bit val to convert to [0, 1) interval
-        double u1 = double(r1 >> 11) / 9007199254740992.0;
-        double u2 = double(r2 >> 11) / 9007199254740992.0;
+        double u1 = double(r1 >> 11) * rng_const;
+        double u2 = double(r2 >> 11) * rng_const;
 
         double cosine = u1*2.0 - 1.0;
         double sine   = sqrt(1.0 - cosine*cosine);
@@ -36,9 +36,9 @@ void init_photon(Photon& phot, xso::rng& rng, bool phi_symmetry) {
         uint64_t r1 = rng(); uint64_t r2 = rng(); uint64_t r3 = rng();
 
         // shift by 11 bits, divide by max 53 bit val to convert to [0, 1) interval
-        double u1 = double(r1 >> 11) / 9007199254740992.0;
-        double u2 = double(r2 >> 11) / 9007199254740992.0;
-        double u3 = double(r3 >> 11) / 9007199254740992.0;
+        double u1 = double(r1 >> 11) * rng_const;
+        double u2 = double(r2 >> 11) * rng_const;
+        double u3 = double(r3 >> 11) * rng_const;
 
         double dir_x = u1*2.0 - 1.0;
         double dir_y = u2*2.0 - 1.0;
@@ -105,7 +105,7 @@ inline double compute_t_to_boundary(Photon& phot, int ix, int iy, int iz) {
     else if (phot.dir_z < -1e-10) t_z = (g_grid.z_edges[iz] - phot.pos_z) / phot.dir_z;
 
     // return closest boundary, update cell indices
-    return min({t_x, t_y, t_z});
+    return min(t_x, min(t_y, t_z));
 }
 
 // tau_to_s(): takes tau, photon
@@ -117,7 +117,7 @@ void tau_to_s(double tau_target, Photon& phot) {
 
     // define variables outside loop
     int ix, iy, iz, T_local;
-    double n_HI, vx_bulk, vy_bulk, vz_bulk, t_boundary, dir_dot_v, x_local, sigma_alpha, dtau, s;
+    double n_HI, vx_bulk, vy_bulk, vz_bulk, t_boundary, dir_dot_v, x_local, sigma_alpha, dtau, s, inv_sqrt_T;
     while (tau_accumulated < tau_target)
     {
         if (escaped(phot)) return;
@@ -132,6 +132,7 @@ void tau_to_s(double tau_target, Photon& phot) {
 
         // get local cell properties
         T_local    = g_grid.temp(ix, iy, iz);
+        inv_sqrt_T = (1.0 / sqrt(T_local)); 
         n_HI    = g_grid.hi(ix, iy, iz);
         vx_bulk = g_grid.velx(ix, iy, iz);
         vy_bulk = g_grid.vely(ix, iy, iz);
@@ -152,13 +153,13 @@ void tau_to_s(double tau_target, Photon& phot) {
         }
 
         // find change in x due to local temperature
-        phot.x          = phot.x * sqrt(phot.local_temp / T_local);
+        phot.x          = phot.x * sqrt(phot.local_temp) * inv_sqrt_T;
         phot.local_temp = T_local;
 
         // find local x due to bulk velocity
         dir_dot_v   = vx_bulk*phot.dir_x + vy_bulk*phot.dir_y + vz_bulk*phot.dir_z;
-        x_local     = phot.x - (dir_dot_v) / (vth_const * sqrt(T_local));
-        sigma_alpha = 5.898e-14 * sqrt(1e4 / T_local) * voigt(x_local, T_local);
+        x_local     = phot.x - (dir_dot_v * inv_sqrt_T) / (vth_const);
+        sigma_alpha = 5.898e-14 * 1e2 * inv_sqrt_T * voigt(x_local, T_local);
 
         // increment tau
         dtau = n_HI * sigma_alpha * (t_boundary + eps);
@@ -194,8 +195,8 @@ double u_parallel(double x_local, double T_local, xso::rng& rng) {
         uint64_t r1 = rng(); uint64_t r2 = rng();
 
         // shift by 11 bits, divide by max 53 bit val to convert to [0, 1) interval
-        double u1 = double(r1 >> 11) / 9007199254740992.0;
-        double u2 = double(r2 >> 11) / 9007199254740992.0;
+        double u1 = double(r1 >> 11) * rng_const;
+        double u2 = double(r2 >> 11) * rng_const;
         if (u1 == 0) u1 = 1.0;
 
         double z = sqrt(-2.0 * log(u1)) * cos(2.0*pi*u2);
@@ -234,10 +235,10 @@ double u_parallel(double x_local, double T_local, xso::rng& rng) {
         {
             // draw univariate
             R  = rng();
-            R1 = double(R >> 11) / 9007199254740992.0;
+            R1 = double(R >> 11) * rng_const;
 
             R = rng();
-            r = double(R >> 11) / 9007199254740992.0;
+            r = double(R >> 11) * rng_const;
             // pick sampling regime
             if (R1 <= p) theta = -pi/2 + r*(theta0 - (-pi/2));
             else theta = theta0 + r*(pi/2 - theta0);
@@ -247,7 +248,7 @@ double u_parallel(double x_local, double T_local, xso::rng& rng) {
 
             // draw second univariate
             R  = rng();
-            R2 = double(R >> 11) / 9007199254740992.0;
+            R2 = double(R >> 11) * rng_const;
 
             // rejection method condition
             if ((R1 <= p) && (R2 <= exp(-u*u))) return u;
@@ -261,7 +262,7 @@ double u_parallel(double x_local, double T_local, xso::rng& rng) {
 double scatter_mu(double x_local, xso::rng& rng) {
     // generate univariate
     uint64_t r0 = rng();
-    double r    = double(r0 >> 11) / 9007199254740992.0;
+    double r    = double(r0 >> 11) * rng_const;
 
     double A, B;
 
@@ -302,8 +303,8 @@ double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     // parallel components - sample normal using box-muller
     uint64_t r1 = rng(); uint64_t r2 = rng();
 
-    double u1 = double(r1 >> 11) / 9007199254740992.0;
-    double u2 = double(r2 >> 11) / 9007199254740992.0;
+    double u1 = double(r1 >> 11) * rng_const;
+    double u2 = double(r2 >> 11) * rng_const;
     if (u1 < 1e-16) u1 = 1e-16;
     
     double R = sqrt(-2.0*log(u1));
@@ -342,7 +343,7 @@ double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     // draw univariate to sample phi
     // (reusing old declarations as a micro-optimization)
     r1 = rng();
-    u1 = double(r1 >> 11) / 9007199254740992.0;
+    u1 = double(r1 >> 11) * rng_const;
 
     // pick new direction
     double phi;

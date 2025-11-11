@@ -10,6 +10,7 @@
 #include "xoshiro.h"
 
 // ========== PHYSICAL CONSTANTS ==========
+
 static const double pi        = M_PI;
 static const double k         = 1.380649e-16;
 static const double c         = 29979245800.0;
@@ -40,6 +41,10 @@ constexpr double B5 = 32.032981933420;
 constexpr double B6 = 9.0328158696;
 constexpr double B7 = 23.7489999060;
 constexpr double B8 = 1.82106170570;
+
+// ========== OTHER CONSTS ========
+
+constexpr double rng_const = 1.0/9007199254740992.0;
 
 // ========== STRUCTURES ==========
 
