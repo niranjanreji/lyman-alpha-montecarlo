@@ -93,7 +93,6 @@ inline double compute_t_to_boundary(Photon& phot, int ix, int iy, int iz) {
     else if (phot.dir_z < -1e-10) t_z = (g_grid.z_edges[iz] - phot.pos_z) / phot.dir_z;
 
     // return closest boundary, update cell indices
-    get_cell_indices(phot, phot.curr_i, phot.curr_j, phot.curr_k);
     return min({t_x, t_y, t_z});
 }
 
@@ -104,28 +103,30 @@ void tau_to_s(double tau_target, Photon& phot) {
     const double eps = g_grid.dx*1e-10;
     double tau_accumulated = 0.0;
 
+    // define variables outside loop
+    int ix, iy, iz, T_local;
+    double n_HI, vx_bulk, vy_bulk, vz_bulk, t_boundary, dir_dot_v, x_local, sigma_alpha, dtau, s;
     while (tau_accumulated < tau_target)
     {
         if (escaped(phot)) return;
 
         // current cell indices
-        int ix, iy, iz;
         get_cell_indices(phot, ix, iy, iz);
 
         // clamp to valid values for safety
-        ix = max(0, min(ix, g_grid.nx - 1));
-        iy = max(0, min(iy, g_grid.ny - 1));
-        iz = max(0, min(iz, g_grid.nz - 1));
+        ix = min(ix, g_grid.nx - 1);
+        iy = min(iy, g_grid.ny - 1);
+        iz = min(iz, g_grid.nz - 1);
 
         // get local cell properties
-        int T_local    = g_grid.temp(ix, iy, iz);
-        double n_HI    = g_grid.hi(ix, iy, iz);
-        double vx_bulk = g_grid.velx(ix, iy, iz);
-        double vy_bulk = g_grid.vely(ix, iy, iz);
-        double vz_bulk = g_grid.velz(ix, iy, iz);
+        T_local    = g_grid.temp(ix, iy, iz);
+        n_HI    = g_grid.hi(ix, iy, iz);
+        vx_bulk = g_grid.velx(ix, iy, iz);
+        vy_bulk = g_grid.vely(ix, iy, iz);
+        vz_bulk = g_grid.velz(ix, iy, iz);
 
         // find dist to next cell
-        double t_boundary = compute_t_to_boundary(phot, ix, iy, iz);
+        t_boundary = compute_t_to_boundary(phot, ix, iy, iz);
 
         // ensure minimum step to avoid getting stuck on boundaries
         if (t_boundary < eps) t_boundary = eps;
@@ -143,16 +144,16 @@ void tau_to_s(double tau_target, Photon& phot) {
         phot.local_temp = T_local;
 
         // find local x due to bulk velocity
-        double dir_dot_v   = vx_bulk*phot.dir_x + vy_bulk*phot.dir_y + vz_bulk*phot.dir_z;
-        double x_local     = phot.x - (dir_dot_v) / (vth_const * sqrt(T_local));
-        double sigma_alpha = 5.898e-14 * sqrt(1e4 / T_local) * voigt(x_local, T_local);
+        dir_dot_v   = vx_bulk*phot.dir_x + vy_bulk*phot.dir_y + vz_bulk*phot.dir_z;
+        x_local     = phot.x - (dir_dot_v) / (vth_const * sqrt(T_local));
+        sigma_alpha = 5.898e-14 * sqrt(1e4 / T_local) * voigt(x_local, T_local);
 
         // increment tau
-        double dtau = n_HI * sigma_alpha * (t_boundary + eps);
+        dtau = n_HI * sigma_alpha * (t_boundary + eps);
 
         // check if tau target is within current cell
         if (tau_accumulated + dtau >= tau_target) {
-            double s = (tau_target - tau_accumulated) / (n_HI * sigma_alpha);
+            s = (tau_target - tau_accumulated) / (n_HI * sigma_alpha);
 
             // update pos, return
             phot.pos_x += s*phot.dir_x;
