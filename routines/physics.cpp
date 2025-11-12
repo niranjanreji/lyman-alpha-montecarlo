@@ -284,7 +284,7 @@ double scatter_mu(double x_local, xso::rng& rng) {
         A = sqrt(B*B + 1);
     }
 
-    return pow(A+B, 1/3) - pow(A-B, 1/3);
+    return pow(A+B, 1.0/3.0) - pow(A-B, 1.0/3.0);
 }
 
 // scatter(): takes photon, cell indices, radial momentum accumulator
