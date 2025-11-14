@@ -172,7 +172,7 @@ void tau_to_s(double tau_target, Photon& phot) {
 }
 
 // u_parallel(): takes photon, rng objects, returns parallel atom velocity
-// uses rejection method / CDF table / gaussian based on |x| regime
+// uses rejection method / gaussian based on |x| regime
 double u_parallel(double x_local, double sqrt_T_local, xso::rng& rng) {
     double x_abs = fabs(x_local);
 
