@@ -11,44 +11,25 @@ using namespace std;
 
 // init_photon(): takes Photon, rng objects
 // sets position, direction of photon
-void init_photon(Photon& phot, xso::rng& rng, bool phi_symmetry) {
+void init_photon(Photon& phot, xso::rng& rng) {
 
     phot.x = 0, phot.pos_x = 0, phot.pos_y = 0, phot.pos_z = 0;
-    if (phi_symmetry)
-    {
-        uint64_t r1 = rng(); uint64_t r2 = rng();
 
-        // shift by 11 bits, divide by max 53 bit val to convert to [0, 1) interval
-        double u1 = double(r1 >> 11) * rng_const;
-        double u2 = double(r2 >> 11) * rng_const;
+    uint64_t r1 = rng(); uint64_t r2 = rng(); uint64_t r3 = rng();
 
-        double cosine = u1*2.0 - 1.0;
-        double sine   = sqrt(1.0 - cosine*cosine);
-        double phi    = u2*2.0*pi;
+    // shift by 11 bits, divide by max 53 bit val to convert to [0, 1) interval
+    double u1 = double(r1 >> 11) * rng_const;
+    double u2 = double(r2 >> 11) * rng_const;
+    double u3 = double(r3 >> 11) * rng_const;
 
-        phot.dir_x = sine*cos(phi);
-        phot.dir_y = sine*sin(phi);
-        phot.dir_z = cosine;
-        phot.phi = phi;
-    }
-    else
-    {
-        uint64_t r1 = rng(); uint64_t r2 = rng(); uint64_t r3 = rng();
+    double dir_x = u1*2.0 - 1.0;
+    double dir_y = u2*2.0 - 1.0;
+    double dir_z = u3*2.0 - 1.0;
 
-        // shift by 11 bits, divide by max 53 bit val to convert to [0, 1) interval
-        double u1 = double(r1 >> 11) * rng_const;
-        double u2 = double(r2 >> 11) * rng_const;
-        double u3 = double(r3 >> 11) * rng_const;
-
-        double dir_x = u1*2.0 - 1.0;
-        double dir_y = u2*2.0 - 1.0;
-        double dir_z = u3*2.0 - 1.0;
-
-        double dir_mag = sqrt(dir_x*dir_x + dir_y*dir_y + dir_z*dir_z);
-        phot.dir_x = dir_x / dir_mag;
-        phot.dir_y = dir_y / dir_mag;
-        phot.dir_z = dir_z / dir_mag;
-    }
+    double dir_mag = sqrt(dir_x*dir_x + dir_y*dir_y + dir_z*dir_z);
+    phot.dir_x = dir_x / dir_mag;
+    phot.dir_y = dir_y / dir_mag;
+    phot.dir_z = dir_z / dir_mag;
 }
 
 // voigt(x, T): takes temperature T, doppler frequency x
@@ -291,7 +272,7 @@ double scatter_mu(double x_local, xso::rng& rng) {
 // changes x, direction by scattering
 // returns radial momentum transfer dp_r (positive = outward momentum to gas)
 double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
-    bool recoil, bool phi_symmetry) {
+    bool recoil) {
 
     int sqrt_T_local = g_grid.sqrt_temp(ix, iy, iz);
     double vth       = vth_const * sqrt_T_local;
@@ -352,9 +333,7 @@ double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     u1 = double(r1 >> 11) * rng_const;
 
     // pick new direction
-    double phi;
-    if (phi_symmetry) phi = phot.phi;
-    else phi = u1 * 2 * pi;
+    double phi = u1 * 2 * pi;
     double cosphi = cos(phi), sinphi = sin(phi);
 
     // generate new direction vector

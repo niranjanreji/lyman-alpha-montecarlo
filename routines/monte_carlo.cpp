@@ -12,7 +12,7 @@ using namespace std;
 
 // monte_carlo(): takes photon count, recoil switch
 // outputs outgoing spectrum, momentum profile text files
-void monte_carlo(int max_photon_count, bool recoil, bool phi_symmetry) {
+void monte_carlo(int max_photon_count, bool recoil) {
     // momentum transfer binning (generalize later?)
     const int nbins   = 200;
     const double rmin = 0.0;
@@ -44,7 +44,7 @@ void monte_carlo(int max_photon_count, bool recoil, bool phi_symmetry) {
         for (int photon_idx = 0; photon_idx < max_photon_count; ++photon_idx)
         {
             Photon phot;
-            init_photon(phot, rng_local, phi_symmetry);
+            init_photon(phot, rng_local);
 
             // initialize local cell temperature for photon
             int ix, iy, iz;
@@ -82,7 +82,7 @@ void monte_carlo(int max_photon_count, bool recoil, bool phi_symmetry) {
                 iz = min(iz, g_grid.nz - 1);
 
                 // scatter the photon and get radial momentum transfer
-                dp_r = scatter(phot, ix, iy, iz, rng_local, recoil, phi_symmetry);
+                dp_r = scatter(phot, ix, iy, iz, rng_local, recoil);
 
                 n_scatters++;
 

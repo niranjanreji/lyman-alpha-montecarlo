@@ -23,7 +23,6 @@ int main(int argc, char* argv[]) {
     // default parameters
     int n_photons = 100000;
     bool recoil  = true;
-    bool phi_sym = false;
     string grid_path = "input/grid.h5";
 
     // parse command line arguments
@@ -33,10 +32,6 @@ int main(int argc, char* argv[]) {
             if (i + 1 < argc) {
                 n_photons = atoi(argv[++i]);
             }
-        }
-        else if (arg == "--no-phi")
-        {
-            phi_sym = true;
         }
         else if (arg == "--no-recoil") {
             recoil = false;
@@ -51,7 +46,6 @@ int main(int argc, char* argv[]) {
             cout << "Options:\n";
             cout << "  -n, --photons N       Number of photons to simulate (default: 100000)\n";
             cout << "  --no-recoil           Disable recoil effect\n";
-            cout << "  --no-phi              System is symmetric w.r.t phi\n";
             cout << "  --grid PATH           Path to grid HDF5 file (default: input/grid.h5)\n";
             cout << "  -h, --help            Show this help message\n";
             return 0;
@@ -76,7 +70,7 @@ int main(int argc, char* argv[]) {
 
     // run Monte Carlo simulation
     cout << "\nStarting Monte Carlo simulation...\n";
-    monte_carlo(n_photons, recoil, phi_sym);
+    monte_carlo(n_photons, recoil);
 
     cout << "\nSimulation complete!\n";
     return 0;
