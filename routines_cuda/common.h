@@ -1,0 +1,159 @@
+#ifndef COMMON_CUDA_H
+#define COMMON_CUDA_H
+
+#define _USE_MATH_DEFINES
+#include <cmath>
+#include <cuda_runtime.h>
+#include <texture_indirect_functions.h>
+#include <curand_kernel.h>
+
+// ========== PHYSICAL CONSTANTS (GPU Constant Memory) ==========
+
+__constant__ double pi          = M_PI;
+__constant__ double k           = 1.380649e-16;
+__constant__ double c           = 29979245800.0;
+__constant__ double h           = 6.62607015e-27;
+__constant__ double m_p         = 1.67262192595e-24;
+__constant__ double A_alpha     = 6.265e8;
+__constant__ double nu_alpha    = 2.466e15;
+__constant__ double vth_const   = 1.28486551932888e5;  // sqrt((2.0*k) / m_p)
+__constant__ double a_const     = 4.701764810494981e-4; // (A_alpha*c) / (4.0*pi*nu_alpha) / vth_const
+__constant__ double hnualphabyc = 5.445824663086854e-13; // (h * nu_alpha)/c
+
+// Approximation taken from Smith et al (2015)
+// ========== VOIGT APPROXIMATION CONSTANTS ==========
+
+__constant__ double A0 = 15.75328153963877;
+__constant__ double A1 = 286.9341762324778;
+__constant__ double A2 = 19.05706700907019;
+__constant__ double A3 = 28.22644017233441;
+__constant__ double A4 = 9.526399802414186;
+__constant__ double A5 = 35.29217026286130;
+__constant__ double A6 = 0.8681020834678775;
+
+__constant__ double B0 = 0.0003300469163682737;
+__constant__ double B1 = 0.5403095364583999;
+__constant__ double B2 = 2.676724102580895;
+__constant__ double B3 = 12.82026082606220;
+__constant__ double B4 = 3.21166435627278;
+__constant__ double B5 = 32.032981933420;
+__constant__ double B6 = 9.0328158696;
+__constant__ double B7 = 23.7489999060;
+__constant__ double B8 = 1.82106170570;
+
+// ========== OTHER CONSTS ========
+
+__constant__ double rng_const   = 1.0/9007199254740992.0;
+__constant__ double sqrt_1_2    = 0.7071067811865476; // sqrt(1.0/2.0)
+__constant__ double two_pi      = 6.283185307179586;  // 2.0*pi
+
+// ========== STRUCTURES ==========
+
+// 3D grid structure (GPU version with texture memory support)
+struct Grid3D {
+    // Grid dimensions
+    int nx, ny, nz;
+
+    // Grid spacing (cm)
+    double dx, dy, dz;
+
+    // Domain size (cm)
+    double Lx, Ly, Lz;
+
+    // Cell edges (1D arrays on device)
+    double* x_edges;
+    double* y_edges;
+    double* z_edges;
+
+    // Cell centers (1D arrays on device)
+    double* x_centers;
+    double* y_centers;
+    double* z_centers;
+
+    // Physical fields (3D arrays flattened to 1D, on device)
+    // These are bound to texture memory for better memory performance
+    cudaTextureObject_t sqrt_T;
+    cudaTextureObject_t HI;
+    cudaTextureObject_t vx;
+    cudaTextureObject_t vy;
+    cudaTextureObject_t vz;
+
+    // Device accessor methods (IDE error doesn't show up if using nvcc)
+    __device__ inline int sqrt_temp(int ix, int iy, int iz) const {
+        int idx = ix*ny*nz + iy*nz + iz;
+        return tex1Dfetch<int>(sqrt_T, idx);
+    }
+    __device__ inline double hi(int ix, int iy, int iz) const {
+        int idx = ix*ny*nz + iy*nz + iz;
+        return tex1Dfetch<double>(HI, idx);
+    }
+    __device__ inline double velx(int ix, int iy, int iz) const {
+        int idx = ix*ny*nz + iy*nz + iz;
+        return tex1Dfetch<double>(vx, idx);
+    }
+    __device__ inline double vely(int ix, int iy, int iz) const {
+        int idx = ix*ny*nz + iy*nz + iz;
+        return tex1Dfetch<double>(vy, idx);
+    }
+    __device__ inline double velz(int ix, int iy, int iz) const {
+        int idx = ix*ny*nz + iy*nz + iz;
+        return tex1Dfetch<double>(vz, idx);
+    }
+};
+
+// Photon structure (already GPU-compatible - POD type)
+struct Photon {
+    // photon direction, position
+    double dir_x, dir_y, dir_z;
+    double pos_x, pos_y, pos_z;
+
+    // photon frequency
+    double x;
+
+    // location
+    int curr_i, curr_j, curr_k;
+
+    // temperature where x is valid
+    int local_sqrt_temp;
+};
+
+// ========== FUNCTION DECLARATIONS ==========
+
+// Host-side grid loading function (uses HDF5, CPU only)
+// Defined in separate .cpp file, not in kernel code
+void load_grid_cuda(const char* path, Grid3D& h_grid, Grid3D& d_grid);
+
+// Device functions (callable from kernels)
+__device__ double voigt(double x, int sqrt_T);
+
+__device__ void get_cell_indices(const Photon& phot, const Grid3D& grid,
+                                  int& ix, int& iy, int& iz);
+
+__device__ void init_photon(Photon& phot, curandState* rng_state, const Grid3D& grid);
+
+__device__ bool escaped(const Photon& phot, const Grid3D& grid);
+
+__device__ double compute_t_to_boundary(const Photon& phot, const Grid3D& grid,
+                                         int ix, int iy, int iz);
+
+__device__ void tau_to_s(double tau_target, Photon& phot, const Grid3D& grid);
+
+__device__ double u_parallel(double x_local, double sqrt_T_local, curandState* rng_state);
+
+__device__ double scatter_mu(double x_local, curandState* rng_state);
+
+__device__ double scatter(Photon& phot, const Grid3D& grid,
+                          int ix, int iy, int iz, curandState* rng_state,
+                          bool recoil = true);
+
+// Kernel for initializing cuRAND states
+__global__ void init_rng_states(curandState* states, unsigned long seed, int n_states);
+
+// Main Monte Carlo kernel (global kernel entry point)
+__global__ void monte_carlo_kernel(Grid3D grid, curandState* rng_states,
+                                   int n_photons, bool recoil);
+
+// Host wrapper function for launching Monte Carlo
+void monte_carlo_cuda(int max_photon_count = 100000, bool recoil = true);
+
+#endif // COMMON_CUDA_H
