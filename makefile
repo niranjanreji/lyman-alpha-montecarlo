@@ -35,4 +35,4 @@ help:
 	@echo   rebuild   - Clean and rebuild
 	@echo   help      - Show this help message
 
-.PHONY: all clean rebuild run run-n help
+.PHONY: all clean rebuild help
