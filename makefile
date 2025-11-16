@@ -27,22 +27,12 @@ clean:
 # Rebuild everything
 rebuild: clean all
 
-# Run the simulation with default parameters
-run: $(TARGET)
-	./$(TARGET)
-
-# Run with custom photon count (usage: make run-n N=1000000)
-run-n: $(TARGET)
-	./$(TARGET) -n $(N)
-
 # Help target
 help:
 	@echo Available targets:
 	@echo   all       - Build the executable (default)
 	@echo   clean     - Remove build artifacts
 	@echo   rebuild   - Clean and rebuild
-	@echo   run       - Build and run with default parameters
-	@echo   run-n     - Build and run with N photons (e.g., make run-n N=1000000)
 	@echo   help      - Show this help message
 
 .PHONY: all clean rebuild run run-n help
