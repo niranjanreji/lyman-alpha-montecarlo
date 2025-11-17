@@ -41,6 +41,7 @@ __constant__ double nu_alpha    = 2.466e15;
 __constant__ double vth_const   = 1.28486551932888e5;  // sqrt((2.0*k) / m_p)
 __constant__ double a_const     = 4.701764810494981e-4; // (A_alpha*c) / (4.0*pi*nu_alpha) / vth_const
 __constant__ double hnualphabyc = 5.445824663086854e-13; // (h * nu_alpha)/c
+__constant__ double INF = __longlong_as_double(0x7ff0000000000000ULL);
 
 // Approximation taken from Smith et al (2015)
 // ========== VOIGT APPROXIMATION CONSTANTS ==========
@@ -149,16 +150,16 @@ Grid3D load_grid(const std::string& path);
 void free_grid(Grid3D& grid);
 
 // device functions (callable from kernels)
-__device__ double voigt(double x, int sqrt_T);
+__device__ __forceinline__ double voigt(double x, int sqrt_T);
 
-__device__ void get_cell_indices(const Photon& phot, const Grid3D& grid,
+__device__ __forceinline__ void get_cell_indices(const Photon& phot, const Grid3D& grid,
                                   int& ix, int& iy, int& iz);
 
-__device__ void init_photon(Photon& phot, PhiloxState& rng_state, const Grid3D& grid);
+__device__ __forceinline__ void init_photon(Photon& phot, PhiloxState& rng_state, const Grid3D& grid);
 
-__device__ bool escaped(const Photon& phot, const Grid3D& grid);
+__device__ __forceinline__ bool escaped(const Photon& phot, const Grid3D& grid);
 
-__device__ double compute_t_to_boundary(const Photon& phot, const Grid3D& grid,
+__device__ __forceinline__ double compute_t_to_boundary(const Photon& phot, const Grid3D& grid,
                                          int ix, int iy, int iz);
 
 __device__ void tau_to_s(double tau_target, Photon& phot, const Grid3D& grid);

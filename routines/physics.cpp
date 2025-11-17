@@ -5,7 +5,6 @@ PHYSICS.CPP / NIRANJAN REJI
 - SCATTERING BEHAVIOR
 */
 
-#include <cmath>
 #include "common.h"
 using namespace std;
 

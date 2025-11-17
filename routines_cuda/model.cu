@@ -225,7 +225,7 @@ __host__ void free_grid(Grid3D& grid) {
 
 
 // locates photon on grid - uses constant memory for ultra-fast access
-__device__ void get_cell_indices(const Photon& phot, const Grid3D& grid, int& ix, int& iy, int& iz) {
+__device__ __forceinline__ void get_cell_indices(const Photon& phot, const Grid3D& grid, int& ix, int& iy, int& iz) {
     ix = (int)((phot.pos_x - g_x_min) / g_dx);
     iy = (int)((phot.pos_y - g_y_min) / g_dy);
     iz = (int)((phot.pos_z - g_z_min) / g_dz);
@@ -233,7 +233,7 @@ __device__ void get_cell_indices(const Photon& phot, const Grid3D& grid, int& ix
 
 
 // checks if photon has escaped from grid - uses constant memory
-__device__ bool escaped(const Photon& phot, const Grid3D& grid) {
+__device__ __forceinline__ bool escaped(const Photon& phot, const Grid3D& grid) {
     return (phot.pos_x < g_x_min || phot.pos_x > g_x_max ||
             phot.pos_y < g_y_min || phot.pos_y > g_y_max ||
             phot.pos_z < g_z_min || phot.pos_z > g_z_max);
