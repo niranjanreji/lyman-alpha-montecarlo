@@ -47,56 +47,57 @@ __constant__ double rng_const   = 1.0/9007199254740992.0;
 __constant__ double sqrt_1_2    = 0.7071067811865476; // sqrt(1.0/2.0)
 __constant__ double two_pi      = 6.283185307179586;  // 2.0*pi
 
+// ========== GRID METADATA (CONSTANT MEMORY FOR FAST ACCESS) ==========
+
+// Grid dimensions (accessed by every thread for indexing)
+__constant__ int g_nx, g_ny, g_nz;
+
+// Grid spacing (used in cell index calculations)
+__constant__ double g_dx, g_dy, g_dz;
+
+// Domain bounds (used for boundary checks)
+__constant__ double g_x_min, g_y_min, g_z_min;
+__constant__ double g_x_max, g_y_max, g_z_max;
+
 // ========== STRUCTURES ==========
 
 // 3D grid structure (GPU version with texture memory support)
+// NOTE: Dimensions/spacing are in __constant__ memory (g_nx, g_ny, g_nz, g_dx, g_dy, g_dz)
 struct Grid3D {
-    // Grid dimensions
-    int nx, ny, nz;
+    // 1D edge/center arrays (texture memory for spatial locality)
+    cudaTextureObject_t tex_x_edges;
+    cudaTextureObject_t tex_y_edges;
+    cudaTextureObject_t tex_z_edges;
+    cudaTextureObject_t tex_x_centers;
+    cudaTextureObject_t tex_y_centers;
+    cudaTextureObject_t tex_z_centers;
 
-    // Grid spacing (cm)
-    double dx, dy, dz;
-
-    // Domain size (cm)
-    double Lx, Ly, Lz;
-
-    // Cell edges (1D arrays on device)
-    double* x_edges;
-    double* y_edges;
-    double* z_edges;
-
-    // Cell centers (1D arrays on device)
-    double* x_centers;
-    double* y_centers;
-    double* z_centers;
-
-    // Physical fields (3D arrays flattened to 1D, on device)
-    // These are bound to texture memory for better memory performance
+    // Physical fields (3D arrays flattened to 1D, bound to texture memory)
     cudaTextureObject_t sqrt_T;
     cudaTextureObject_t HI;
     cudaTextureObject_t vx;
     cudaTextureObject_t vy;
     cudaTextureObject_t vz;
 
-    // Device accessor methods (IDE error doesn't show up if using nvcc)
+    // Device accessor methods - use g_nx, g_ny, g_nz from constant memory
     __device__ inline int sqrt_temp(int ix, int iy, int iz) const {
-        int idx = ix*ny*nz + iy*nz + iz;
+        int idx = ix * g_ny * g_nz + iy * g_nz + iz;
         return tex1Dfetch<int>(sqrt_T, idx);
     }
     __device__ inline double hi(int ix, int iy, int iz) const {
-        int idx = ix*ny*nz + iy*nz + iz;
+        int idx = ix * g_ny * g_nz + iy * g_nz + iz;
         return tex1Dfetch<double>(HI, idx);
     }
     __device__ inline double velx(int ix, int iy, int iz) const {
-        int idx = ix*ny*nz + iy*nz + iz;
+        int idx = ix * g_ny * g_nz + iy * g_nz + iz;
         return tex1Dfetch<double>(vx, idx);
     }
     __device__ inline double vely(int ix, int iy, int iz) const {
-        int idx = ix*ny*nz + iy*nz + iz;
+        int idx = ix * g_ny * g_nz + iy * g_nz + iz;
         return tex1Dfetch<double>(vy, idx);
     }
     __device__ inline double velz(int ix, int iy, int iz) const {
-        int idx = ix*ny*nz + iy*nz + iz;
+        int idx = ix * g_ny * g_nz + iy * g_nz + iz;
         return tex1Dfetch<double>(vz, idx);
     }
 };
