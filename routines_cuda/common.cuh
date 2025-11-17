@@ -7,6 +7,28 @@
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 
+// use cuRAND's Philox implementation for RNG
+typedef curandStatePhilox4_32_10_t PhiloxState;
+
+// simple wrapper functions for RNG
+__device__ __forceinline__ void philox_init(PhiloxState& state, uint64_t seed, uint64_t sequence) {
+    curand_init(seed, sequence, 0, &state);
+}
+
+__device__ __forceinline__ double philox_uniform(PhiloxState& state) {
+    return curand_uniform_double(&state);
+}
+
+__device__ __forceinline__ double philox_normal(PhiloxState& state) {
+    return curand_normal_double(&state);
+}
+
+__device__ __forceinline__ void philox_normal_pair(PhiloxState& state, double& z0, double& z1) {
+    double2 result = curand_normal2_double(&state);
+    z0 = result.x;
+    z1 = result.y;
+}
+
 // ========== PHYSICAL CONSTANTS (GPU Constant Memory) ==========
 
 __constant__ double pi          = M_PI;
@@ -65,12 +87,12 @@ __constant__ double g_x_max, g_y_max, g_z_max;
 // NOTE: Dimensions/spacing are in __constant__ memory (g_nx, g_ny, g_nz, g_dx, g_dy, g_dz)
 struct Grid3D {
     // 1D edge/center arrays (texture memory for spatial locality)
-    cudaTextureObject_t tex_x_edges;
-    cudaTextureObject_t tex_y_edges;
-    cudaTextureObject_t tex_z_edges;
-    cudaTextureObject_t tex_x_centers;
-    cudaTextureObject_t tex_y_centers;
-    cudaTextureObject_t tex_z_centers;
+    cudaTextureObject_t x_edges;
+    cudaTextureObject_t y_edges;
+    cudaTextureObject_t z_edges;
+    cudaTextureObject_t x_centers;
+    cudaTextureObject_t y_centers;
+    cudaTextureObject_t z_centers;
 
     // Physical fields (3D arrays flattened to 1D, bound to texture memory)
     cudaTextureObject_t sqrt_T;
@@ -120,16 +142,19 @@ struct Photon {
 
 // ========== FUNCTION DECLARATIONS ==========
 
-// Host-side grid loading function
-void load_grid_cuda(const char* path, Grid3D& h_grid, Grid3D& d_grid);
+// host-side grid loading function
+Grid3D load_grid(const std::string& path);
 
-// Device functions (callable from kernels)
+// host-side grid cleanup function
+void free_grid(Grid3D& grid);
+
+// device functions (callable from kernels)
 __device__ double voigt(double x, int sqrt_T);
 
 __device__ void get_cell_indices(const Photon& phot, const Grid3D& grid,
                                   int& ix, int& iy, int& iz);
 
-__device__ void init_photon(Photon& phot, curandState* rng_state, const Grid3D& grid);
+__device__ void init_photon(Photon& phot, PhiloxState& rng_state, const Grid3D& grid);
 
 __device__ bool escaped(const Photon& phot, const Grid3D& grid);
 
@@ -138,22 +163,19 @@ __device__ double compute_t_to_boundary(const Photon& phot, const Grid3D& grid,
 
 __device__ void tau_to_s(double tau_target, Photon& phot, const Grid3D& grid);
 
-__device__ double u_parallel(double x_local, double sqrt_T_local, curandState* rng_state);
+__device__ double u_parallel(double x_local, double sqrt_T_local, PhiloxState& rng_state);
 
-__device__ double scatter_mu(double x_local, curandState* rng_state);
+__device__ double scatter_mu(double x_local, PhiloxState& rng_state);
 
 __device__ double scatter(Photon& phot, const Grid3D& grid,
-                          int ix, int iy, int iz, curandState* rng_state,
+                          int ix, int iy, int iz, PhiloxState& rng_state,
                           bool recoil = true);
 
-// Kernel for initializing cuRAND states
-__global__ void init_rng_states(curandState* states, unsigned long seed, int n_states);
-
-// Main Monte Carlo kernel (global kernel entry point)
-__global__ void monte_carlo_kernel(Grid3D grid, curandState* rng_states,
+// main Monte Carlo kernel (global kernel entry point)
+__global__ void monte_carlo_kernel(Grid3D grid, unsigned long seed,
                                    int n_photons, bool recoil);
 
-// Host wrapper function for launching Monte Carlo
+// host wrapper function for launching Monte Carlo
 void monte_carlo_cuda(int max_photon_count = 100000, bool recoil = true);
 
 #endif // COMMON_CUDA_H

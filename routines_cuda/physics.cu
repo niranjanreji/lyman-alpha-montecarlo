@@ -1,0 +1,12 @@
+/*
+PHYSICS.CPP / NIRANJAN REJI
+- VOIGT FUNCTION APPROXIMATION (SMITH ET AL 2015)
+- DISTANCE AS A FUNCTION OF TAU
+- SCATTERING BEHAVIOR
+*/
+
+#include <cmath>
+#include "common.cuh"
+
+using namespace std;
+

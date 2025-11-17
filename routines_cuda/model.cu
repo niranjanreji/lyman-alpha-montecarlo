@@ -89,7 +89,7 @@ __host__ Grid3D load_grid(const string& path) {
     read_scalar(f, "Ly", Ly, PredType::NATIVE_DOUBLE);
     read_scalar(f, "Lz", Lz, PredType::NATIVE_DOUBLE);
 
-    // Copy grid metadata to CONSTANT memory for ultra-fast access
+    // copy grid metadata to CONSTANT memory for ultra-fast access
     cudaMemcpyToSymbol(g_nx, &nx, sizeof(int));
     cudaMemcpyToSymbol(g_ny, &ny, sizeof(int));
     cudaMemcpyToSymbol(g_nz, &nz, sizeof(int));
@@ -101,7 +101,7 @@ __host__ Grid3D load_grid(const string& path) {
     cudaStream_t stream;
     cudaStreamCreate(&stream);
 
-    // Read edge and center arrays
+    // read edge and center arrays
     double *h_x_edges, *h_y_edges, *h_z_edges;
     double *h_x_centers, *h_y_centers, *h_z_centers;
     int n_temp;
@@ -113,7 +113,7 @@ __host__ Grid3D load_grid(const string& path) {
     read_1d_pinned(f, "y_centers", h_y_centers, n_temp);
     read_1d_pinned(f, "z_centers", h_z_centers, n_temp);
 
-    // Extract domain bounds and copy to constant memory (for boundary checks)
+    // extract domain bounds and copy to constant memory (for boundary checks)
     double x_min = h_x_edges[0], x_max = h_x_edges[nx];
     double y_min = h_y_edges[0], y_max = h_y_edges[ny];
     double z_min = h_z_edges[0], z_max = h_z_edges[nz];
@@ -125,7 +125,7 @@ __host__ Grid3D load_grid(const string& path) {
     cudaMemcpyToSymbol(g_y_max, &y_max, sizeof(double));
     cudaMemcpyToSymbol(g_z_max, &z_max, sizeof(double));
 
-    // Allocate device memory for edge/center arrays
+    // allocate device memory for edge/center arrays
     double *d_x_edges, *d_y_edges, *d_z_edges;
     double *d_x_centers, *d_y_centers, *d_z_centers;
 
@@ -136,7 +136,7 @@ __host__ Grid3D load_grid(const string& path) {
     cudaMalloc(&d_y_centers, ny * sizeof(double));
     cudaMalloc(&d_z_centers, nz * sizeof(double));
 
-    // Async copy edge/center arrays to device
+    // async copy edge/center arrays to device
     cudaMemcpyAsync(d_x_edges, h_x_edges, (nx + 1) * sizeof(double), cudaMemcpyHostToDevice, stream);
     cudaMemcpyAsync(d_y_edges, h_y_edges, (ny + 1) * sizeof(double), cudaMemcpyHostToDevice, stream);
     cudaMemcpyAsync(d_z_edges, h_z_edges, (nz + 1) * sizeof(double), cudaMemcpyHostToDevice, stream);
@@ -185,12 +185,12 @@ __host__ Grid3D load_grid(const string& path) {
     grid.vz = create_texture<double>(d_vz, num_cells);
 
     // create texture objects for edge/center arrays
-    grid.tex_x_edges = create_texture<double>(d_x_edges, nx + 1);
-    grid.tex_y_edges = create_texture<double>(d_y_edges, ny + 1);
-    grid.tex_z_edges = create_texture<double>(d_z_edges, nz + 1);
-    grid.tex_x_centers = create_texture<double>(d_x_centers, nx);
-    grid.tex_y_centers = create_texture<double>(d_y_centers, ny);
-    grid.tex_z_centers = create_texture<double>(d_z_centers, nz);
+    grid.x_edges = create_texture<double>(d_x_edges, nx + 1);
+    grid.y_edges = create_texture<double>(d_y_edges, ny + 1);
+    grid.z_edges = create_texture<double>(d_z_edges, nz + 1);
+    grid.x_centers = create_texture<double>(d_x_centers, nx);
+    grid.y_centers = create_texture<double>(d_y_centers, ny);
+    grid.z_centers = create_texture<double>(d_z_centers, nz);
 
     // free the host memory we used earlier
     cudaFreeHost(h_x_edges); cudaFreeHost(h_y_edges); cudaFreeHost(h_z_edges);
@@ -215,12 +215,12 @@ __host__ void free_grid(Grid3D& grid) {
     cudaDestroyTextureObject(grid.vz);
 
     // Destroy edge/center texture objects
-    cudaDestroyTextureObject(grid.tex_x_edges);
-    cudaDestroyTextureObject(grid.tex_y_edges);
-    cudaDestroyTextureObject(grid.tex_z_edges);
-    cudaDestroyTextureObject(grid.tex_x_centers);
-    cudaDestroyTextureObject(grid.tex_y_centers);
-    cudaDestroyTextureObject(grid.tex_z_centers);
+    cudaDestroyTextureObject(grid.x_edges);
+    cudaDestroyTextureObject(grid.y_edges);
+    cudaDestroyTextureObject(grid.z_edges);
+    cudaDestroyTextureObject(grid.x_centers);
+    cudaDestroyTextureObject(grid.y_centers);
+    cudaDestroyTextureObject(grid.z_centers);
 }
 
 
