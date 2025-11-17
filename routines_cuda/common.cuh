@@ -3,8 +3,8 @@
 
 #define _USE_MATH_DEFINES
 #include <cmath>
+#include "H5Cpp.h"
 #include <cuda_runtime.h>
-#include <texture_indirect_functions.h>
 #include <curand_kernel.h>
 
 // ========== PHYSICAL CONSTANTS (GPU Constant Memory) ==========
@@ -119,8 +119,7 @@ struct Photon {
 
 // ========== FUNCTION DECLARATIONS ==========
 
-// Host-side grid loading function (uses HDF5, CPU only)
-// Defined in separate .cpp file, not in kernel code
+// Host-side grid loading function
 void load_grid_cuda(const char* path, Grid3D& h_grid, Grid3D& d_grid);
 
 // Device functions (callable from kernels)
