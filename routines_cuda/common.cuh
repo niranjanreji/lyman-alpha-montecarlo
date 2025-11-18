@@ -66,9 +66,8 @@ __constant__ double B8 = 1.82106170570;
 
 // ========== OTHER CONSTS ========
 
-__constant__ double rng_const   = 1.0/9007199254740992.0;
-__constant__ double sqrt_1_2    = 0.7071067811865476; // sqrt(1.0/2.0)
-__constant__ double two_pi      = 6.283185307179586;  // 2.0*pi
+__constant__ double inv_sqrt_2 = 0.7071067811865476; // sqrt(1.0/2.0)
+__constant__ double two_pi     = 6.283185307179586;  // 2.0*pi
 
 // ========== GRID METADATA (CONSTANT MEMORY FOR FAST ACCESS) ==========
 
@@ -162,15 +161,15 @@ __device__ __forceinline__ bool escaped(const Photon& phot, const Grid3D& grid);
 __device__ __forceinline__ double compute_t_to_boundary(const Photon& phot, const Grid3D& grid,
                                          int ix, int iy, int iz);
 
-__device__ void tau_to_s(double tau_target, Photon& phot, const Grid3D& grid);
+__device__ void tau_to_s(const double tau_target, Photon& phot, const Grid3D& grid);
 
-__device__ double u_parallel(double x_local, double sqrt_T_local, PhiloxState& rng_state);
+__device__ double u_parallel(const double x_local, const double sqrt_T_local, PhiloxState& rng_state);
 
-__device__ double scatter_mu(double x_local, PhiloxState& rng_state);
+__device__ double scatter_mu(const double x_local, PhiloxState& rng_state);
 
-__device__ double scatter(Photon& phot, const Grid3D& grid,
-                          int ix, int iy, int iz, PhiloxState& rng_state,
-                          bool recoil = true);
+__device__ void scatter(Photon& phot, const Grid3D& grid,
+                          const int ix, const int iy, const int iz, PhiloxState& rng_state,
+                          const bool recoil = true);
 
 // main Monte Carlo kernel (global kernel entry point)
 __global__ void monte_carlo_kernel(Grid3D grid, unsigned long seed,
