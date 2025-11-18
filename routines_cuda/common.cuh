@@ -172,10 +172,9 @@ __device__ void scatter(Photon& phot, const Grid3D& grid,
                           const bool recoil = true);
 
 // main Monte Carlo kernel (global kernel entry point)
-__global__ void monte_carlo_kernel(Grid3D grid, unsigned long seed,
-                                   int n_photons, bool recoil);
+__global__ void monte_carlo_kernel(const Grid3D grid, int max_photons, double* x_vals, long long* scatters, bool recoil);
 
 // host wrapper function for launching Monte Carlo
-void monte_carlo_cuda(int max_photon_count = 100000, bool recoil = true);
+void monte_carlo_cuda(const Grid3D grid, int max_photon_count = 100000, int blocks, int threads, bool recoil = true);
 
 #endif // COMMON_CUDA_H
