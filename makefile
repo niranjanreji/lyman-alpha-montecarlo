@@ -1,38 +1,42 @@
 # Makefile for 3D Monte Carlo Ly-alpha Radiative Transfer
 # Niranjan Reji
 
-# Compiler and flags
+# Compilers and flags
 CXX = clang++
-CXXFLAGS = -std=c++23 -O3 -fopenmp
-
-# Compiler settings (optimized for Windows/MSYS2)
+CXXFLAGS = -std=c++20 -O3 -fopenmp
+NVCC = nvcc
+NVCCFLAGS = -O3 -std=c++17 --expt-relaxed-constexpr
 LIBS = -lhdf5_cpp -lhdf5 -lszip -lzlib
 
-# Target executable
-TARGET = mc.exe
+# Default target
+all: help
 
-# Default target - direct compilation (no intermediate object files)
-all: $(TARGET)
+# CPU build
+cpu:
+	$(CXX) $(CXXFLAGS) -o mc.exe main.cpp $(LIBS)
+	@echo CPU compilation successful!
 
-# Compile directly to executable (unity build)
-$(TARGET): main.cpp routines/model.cpp routines/physics.cpp routines/monte_carlo.cpp routines/common.h
-	$(CXX) $(CXXFLAGS) -o $@ main.cpp $(LIBS)
-	@echo Compilation successful!
+# GPU build - separate compilation to avoid NVCC parsing HDF5 headers
+gpu: routines_cuda/hdf5_loader.o
+	$(NVCC) $(NVCCFLAGS) -o mc_cuda.exe main.cu routines_cuda/hdf5_loader.o $(LIBS)
+	@echo GPU compilation successful!
 
-# Clean build artifacts
+# Compile HDF5 loader separately with clang++
+# Assumes CUDA_PATH environment variable is set (default CUDA installation does this)
+routines_cuda/hdf5_loader.o: routines_cuda/hdf5_loader.cpp routines_cuda/hdf5_loader.h
+	$(CXX) -c -O3 -std=c++17 -o routines_cuda/hdf5_loader.o routines_cuda/hdf5_loader.cpp
+
+# Clean
 clean:
-	-@rm -f $(TARGET) *.o
+	-@rm -f mc.exe mc_cuda.exe routines_cuda/*.o *.o
 	@echo Clean complete.
 
-# Rebuild everything
-rebuild: clean all
-
-# Help target
+# Help
 help:
 	@echo Available targets:
-	@echo   all       - Build the executable (default)
-	@echo   clean     - Remove build artifacts
-	@echo   rebuild   - Clean and rebuild
-	@echo   help      - Show this help message
+	@echo   cpu   - Build CPU version (mc.exe)
+	@echo   gpu   - Build GPU version (mc_cuda.exe)
+	@echo   clean - Remove build artifacts
+	@echo   help  - Show this message
 
-.PHONY: all clean rebuild help
+.PHONY: all cpu gpu clean help
