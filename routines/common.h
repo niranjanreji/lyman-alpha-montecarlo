@@ -45,6 +45,7 @@ constexpr double B8 = 1.82106170570;
 
 // ========== OTHER CONSTS ========
 
+constexpr double mu_const    = (11*11*11)/37.0;
 constexpr double rng_const   = 1.0/9007199254740992.0;
 static const double sqrt_1_2 = sqrt(1.0/2.0);
 static const double two_pi = 2.0*pi;
@@ -69,17 +70,17 @@ struct Grid3D {
     std::vector<double> x_centers, y_centers, z_centers;
 
     // Physical fields (3D arrays flattened to 1D)
-    std::vector<int> T;            // Temperature [K]
-    std::vector<int> sqrt_T;       // Sqrt Temp [K^0.5]
+    std::vector<double> T;         // Temperature [K]
+    std::vector<double> sqrt_T;    // Sqrt Temp [K^0.5]
     std::vector<double> HI;        // HI number density [cm^-3]
     std::vector<double> vx;        // Bulk velocity [cm/s]
     std::vector<double> vy;
     std::vector<double> vz;
 
-    inline int sqrt_temp(int ix, int iy, int iz) const {
+    inline double sqrt_temp(int ix, int iy, int iz) const {
         return sqrt_T[ix*ny*nz + iy*nz + iz];
     }
-    inline int temp(int ix, int iy, int iz) const {
+    inline double temp(int ix, int iy, int iz) const {
         return T[ix*ny*nz + iy*nz + iz];
     }
     inline double hi(int ix, int iy, int iz) const {
@@ -109,7 +110,7 @@ struct Photon {
     int curr_i, curr_j, curr_k;
 
     // temperature where x is valid
-    int local_sqrt_temp;
+    double local_sqrt_temp;
 };
 
 extern Grid3D g_grid;
@@ -119,7 +120,7 @@ extern Grid3D g_grid;
 // Grid functions
 void load_grid(const std::string& path);
 
-double voigt(double x, int sqrt_T);
+double voigt(double x, double sqrt_T);
 
 // get_cell_indices: fast index lookup for uniform grid
 void get_cell_indices(Photon& phot, int& ix, int& iy, int& iz);

@@ -29,7 +29,7 @@ void monte_carlo(int max_photon_count, bool recoil) {
     long long total_scatters = 0;
 
     // rng seed, runtime measurement
-    const unsigned base_seed = 1234567u;
+    const unsigned base_seed = 0;
     auto start = chrono::high_resolution_clock::now();
 
     #pragma omp parallel
@@ -51,12 +51,13 @@ void monte_carlo(int max_photon_count, bool recoil) {
             get_cell_indices(phot, ix, iy, iz);
             phot.local_sqrt_temp = g_grid.sqrt_temp(ix, iy, iz);
             int n_scatters = 0;
+            int max_scat = 10000000;  // debug code
 
             // pre-allocate mem for while loop variables
             uint64_t R;
             double r, tau, dp_r, r_scatter;
-            int T_local, bin_idx;
-            while (!escaped(phot))
+            int bin_idx;
+            while (!escaped(phot) && n_scatters < max_scat)
             {
                 // draw random optical depth
                 R   = rng_local();
@@ -66,12 +67,7 @@ void monte_carlo(int max_photon_count, bool recoil) {
                 // update photon position
                 tau_to_s(tau, phot);
 
-                if (escaped(phot))
-                {
-                    // shift x to standard temperature scale
-                    phot.x *= phot.local_sqrt_temp/1e2;
-                    break;
-                }
+                if (escaped(phot)) break;
 
                 // find current cell indices
                 get_cell_indices(phot, ix, iy, iz);
@@ -83,7 +79,6 @@ void monte_carlo(int max_photon_count, bool recoil) {
 
                 // scatter the photon and get radial momentum transfer
                 dp_r = scatter(phot, ix, iy, iz, rng_local, recoil);
-
                 n_scatters++;
 
                 // bin the momentum by radial distance
@@ -94,6 +89,8 @@ void monte_carlo(int max_photon_count, bool recoil) {
                 }
             }
 
+            // shift to standard temp scale
+            phot.x *= phot.local_sqrt_temp/1e2;
             output_x_vals[photon_idx] = phot.x;
 
             // update progress counter

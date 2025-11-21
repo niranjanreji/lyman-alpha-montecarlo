@@ -114,8 +114,8 @@ def create_3d_grid():
         f.create_dataset('Lz', data=Lz)
 
         # Temperature, Densities, Velocity Field
-        f.create_dataset('T', data=T_grid, dtype='u4')
-        f.create_dataset('sqrt_T', data=sqrt_T_grid, dtype='u4')
+        f.create_dataset('T', data=T_grid)
+        f.create_dataset('sqrt_T', data=sqrt_T_grid)
         f.create_dataset('HI', data=HI_grid)
         f.create_dataset('vx', data=vx_grid)
         f.create_dataset('vy', data=vy_grid)
