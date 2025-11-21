@@ -173,6 +173,7 @@ void tau_to_s(double tau_target, Photon& phot) {
 // u_parallel(): takes photon, rng objects, returns parallel atom velocity
 // uses rejection method / gaussian based on |x| regime
 double u_parallel(double x_local, double sqrt_T_local, xso::rng& rng) {
+    double signe = (x_local >= 0.0) ? +1.0 : -1.0;
     double x_abs = fabs(x_local);
 
     // x > 8 regime approximated by gaussian
@@ -184,33 +185,35 @@ double u_parallel(double x_local, double sqrt_T_local, xso::rng& rng) {
         // shift by 11 bits, divide by max 53 bit val to convert to [0, 1) interval
         double u1 = double(r1 >> 11) * rng_const;
         double u2 = double(r2 >> 11) * rng_const;
-        if (u1 == 0) u1 = 1.0;
+        if (u1 == 0) u1 = 1e-16;
 
         double z = sqrt(-log(u1)) * cos(2.0*pi*u2);
-        return (1.0 / x_local) + (z);
+        return signe*((1.0 / x_abs) + (z));
     }
-
-    // core approximated using rejection sampling
-    //if (x_abs < 1.0)
     else
     {
         double a    = a_const / sqrt_T_local;
         double zeta = log10(a);
 
-        double x2 = x_local * x_local;
-        double x3 = x2 * x_local;
-        double x4 = x3 * x_local;
-        double x5 = x4 * x_local;
-        double z2 = zeta * zeta;
+        // taken from RASCAS source
+        double u0;
+        if (x_abs < 0.6) u0 = 0;
+        else {
+            double x2 = x_abs * x_abs;
+            double x3 = x2 * x_abs;
+            double x4 = x3 * x_abs;
+            double x5 = x4 * x_abs;
+            double z2 = zeta * zeta;
 
-        double u0 = 2.648963 + 2.014446*zeta + 0.351479*z2;
-        u0 += x_local*(-4.058673 - 3.675859*zeta - 0.640003*z2);
-        u0 += x2*(3.017395 + 2.117133*zeta + 0.370294*z2);
-        u0 += x3*(-0.869789 - 0.565886*zeta - 0.096312*z2);
-        u0 += x4*(0.110987 + 0.070103*zeta + 0.011557*z2);
-        u0 += x5*(-0.005200 - 0.003240*zeta - 0.000519*z2);
+            u0  = 2.648963 + 2.014446*zeta + 0.351479*z2;
+            u0 += x_abs*(-4.058673 - 3.675859*zeta - 0.640003*z2);
+            u0 += x2*(3.017395 + 2.117133*zeta + 0.370294*z2);
+            u0 += x3*(-0.869789 - 0.565886*zeta - 0.096312*z2);
+            u0 += x4*(0.110987 + 0.070103*zeta + 0.011557*z2);
+            u0 += x5*(-0.005200 - 0.003240*zeta - 0.000519*z2);
+        }
 
-        double theta0 = atan((u0 - x_local) / a);
+        double theta0 = atan((u0 - x_abs) / a);
         double u02 = u0*u0;
         double eu0 = exp(-u02);
         double p = (theta0 + pi/2)/( (1 - eu0)*theta0 + (1 + eu0)*pi/2 );
@@ -230,7 +233,7 @@ double u_parallel(double x_local, double sqrt_T_local, xso::rng& rng) {
             if (R1 <= p) theta = -pi/2 + r*(theta0 - (-pi/2));
             else theta = theta0 + r*(pi/2 - theta0);
 
-            u = a*tan(theta) + x_local;
+            u = a*tan(theta) + x_abs;
             if (!isfinite(u)) continue;
 
             // draw second univariate
@@ -238,8 +241,8 @@ double u_parallel(double x_local, double sqrt_T_local, xso::rng& rng) {
             R2 = double(R >> 11) * rng_const;
 
             // rejection method condition
-            if ((R1 <= p) && (R2 <= exp(-u*u))) return u;
-            if ((R1 > p) && (R2 <= exp(u02 - u*u))) return u;
+            if ((R1 <= p) && (R2 <= exp(-u*u))) return u*signe;
+            if ((R1 > p) && (R2 <= exp(u02 - u*u))) return u*signe;
         }
     }
 }
