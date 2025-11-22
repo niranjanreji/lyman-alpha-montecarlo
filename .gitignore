@@ -2,4 +2,5 @@ input/grid.h5
 momentum_profile.txt
 spectrum.txt
 plot_spectrum.py
+plot_momentum.py
 test.py
