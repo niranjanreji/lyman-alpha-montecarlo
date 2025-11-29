@@ -134,13 +134,13 @@ void monte_carlo(int max_photon_count, bool recoil) {
     cout << "Total runtime: " << total_elapsed.count() << " s" << endl;
 
     // write x values to output file to be plotted using python
-    ofstream fout("spectrum.txt");
+    ofstream fout("output/spectrum.txt");
     for (double xv : output_x_vals) fout << xv << "\n";
     fout.close();
     cout << "Wrote spectrum.txt (" << output_x_vals.size() << " values)\n";
 
     // write momentum profile
-    ofstream pfout("momentum_profile.txt");
+    ofstream pfout("output/momentum_profile.txt");
     for (int b = 0; b < nbins; ++b)
     {
         double r_center = rmin + (b + 0.5) * binw;

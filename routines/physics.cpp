@@ -8,24 +8,75 @@ PHYSICS.CPP / NIRANJAN REJI
 #include "common.h"
 using namespace std;
 
-// init_photon(): takes Photon, rng objects
-// sets position, direction of photon
+// init_photon(): initialize photon position and direction
+// samples position from CDF of grid + point sources, direction isotropic
 void init_photon(Photon& phot, xso::rng& rng) {
+    // initialize frequency to line center
+    phot.x = 0.0;
+    phot.pos_x = 0.0;
+    phot.pos_y = 0.0;
+    phot.pos_z = 0.0;
 
-    phot.x = 0, phot.pos_x = 0, phot.pos_y = 0, phot.pos_z = 0;
+    // sample position from luminosity CDF
+    double u = uniform_random(rng);
+    int last_idx = g_grid.nx * g_grid.ny * g_grid.nz - 1;
 
-    uint64_t r1 = rng(); uint64_t r2 = rng();
+    if (u <= g_grid.nphot_cloud[last_idx]) {
+        // sample from photon cloud using binary search on CDF
+        int left = 0;
+        int right = last_idx;
 
-    // shift by 11 bits, divide by max 53 bit val to convert to [0, 1) interval
-    double u1 = double(r1 >> 11) * rng_const;
-    double u2 = double(r2 >> 11) * rng_const;
+        while (left < right) {
+            int mid = left + (right - left) / 2;
+            if (g_grid.nphot_cloud[mid] < u) {
+                left = mid + 1;
+            } else {
+                right = mid;
+            }
+        }
 
-    // uniform sphere sampling: sample cos(theta) uniformly in [-1, 1]
-    // and phi uniformly in [0, 2*pi]
-    double cos_theta = 2.0*u1 - 1.0;
-    double phi = 2.0*pi*u2;
+        // convert 1D index to 3D cell indices
+        int cell_idx = left;
+        int iz = cell_idx % g_grid.nz;
+        int iy = (cell_idx / g_grid.nz) % g_grid.ny;
+        int ix = cell_idx / (g_grid.ny * g_grid.nz);
 
-    double sin_theta = sqrt(1.0 - cos_theta*cos_theta);
+        // sample uniform position within selected cell
+        double ux = uniform_random(rng);
+        double uy = uniform_random(rng);
+        double uz = uniform_random(rng);
+
+        phot.pos_x = g_grid.x_edges[ix] + ux * g_grid.dx;
+        phot.pos_y = g_grid.y_edges[iy] + uy * g_grid.dy;
+        phot.pos_z = g_grid.z_edges[iz] + uz * g_grid.dz;
+    } else {
+        // sample from point sources using binary search on CDF
+        int left = 0;
+        int right = g_grid.n_point_sources - 1;
+
+        while (left < right) {
+            int mid = left + (right - left) / 2;
+            if (g_grid.point_sources[mid].luminosity < u) {
+                left = mid + 1;
+            } else {
+                right = mid;
+            }
+        }
+
+        // place photon at exact point source location
+        phot.pos_x = g_grid.point_sources[left].x;
+        phot.pos_y = g_grid.point_sources[left].y;
+        phot.pos_z = g_grid.point_sources[left].z;
+    }
+
+    // sample isotropic direction
+    double u1 = uniform_random(rng);
+    double u2 = uniform_random(rng);
+
+    double cos_theta = 2.0 * u1 - 1.0;
+    double phi = two_pi * u2;
+
+    double sin_theta = sqrt(1.0 - cos_theta * cos_theta);
     phot.dir_x = sin_theta * cos(phi);
     phot.dir_y = sin_theta * sin(phi);
     phot.dir_z = cos_theta;
@@ -170,25 +221,20 @@ void tau_to_s(double tau_target, Photon& phot) {
     }
 }
 
-// u_parallel(): takes photon, rng objects, returns parallel atom velocity
-// uses rejection method / gaussian based on |x| regime
+// u_parallel(): sample parallel atom velocity component
+// uses rejection method for |x| < 8, gaussian approximation for |x| >= 8
 double u_parallel(double x_local, double sqrt_T_local, xso::rng& rng) {
     double signe = (x_local >= 0.0) ? +1.0 : -1.0;
     double x_abs = fabs(x_local);
 
-    // x > 8 regime approximated by gaussian
-    if (x_abs >= 8.0) 
-    {
-        // box-muller method
-        uint64_t r1 = rng(); uint64_t r2 = rng();
+    // x > 8 regime: gaussian approximation using box-muller
+    if (x_abs >= 8.0) {
+        double u1 = uniform_random(rng);
+        double u2 = uniform_random(rng);
+        if (u1 == 0.0) u1 = 1e-16;
 
-        // shift by 11 bits, divide by max 53 bit val to convert to [0, 1) interval
-        double u1 = double(r1 >> 11) * rng_const;
-        double u2 = double(r2 >> 11) * rng_const;
-        if (u1 == 0) u1 = 1e-16;
-
-        double z = sqrt(-log(u1)) * cos(2.0*pi*u2);
-        return signe*((1.0 / x_abs) + (z));
+        double z = sqrt(-log(u1)) * cos(two_pi * u2);
+        return signe * ((1.0 / x_abs) + z);
     }
     else
     {
@@ -218,93 +264,79 @@ double u_parallel(double x_local, double sqrt_T_local, xso::rng& rng) {
         double eu0 = exp(-u02);
         double p = (theta0 + pi/2)/( (1 - eu0)*theta0 + (1 + eu0)*pi/2 );
 
-        // pre-define variables for inner loop
+        // rejection sampling loop
         double R1, theta, u, R2, r;
-        uint64_t R;
-        while (true)
-        {
-            // draw univariate
-            R  = rng();
-            R1 = double(R >> 11) * rng_const;
+        while (true) {
+            // draw two uniform random numbers
+            R1 = uniform_random(rng);
+            r = uniform_random(rng);
 
-            R = rng();
-            r = double(R >> 11) * rng_const;
             // pick sampling regime
-            if (R1 <= p) theta = -pi/2 + r*(theta0 - (-pi/2));
-            else theta = theta0 + r*(pi/2 - theta0);
+            if (R1 <= p) {
+                theta = -pi/2 + r * (theta0 + pi/2);
+            } else {
+                theta = theta0 + r * (pi/2 - theta0);
+            }
 
-            u = a*tan(theta) + x_abs;
+            u = a * tan(theta) + x_abs;
             if (!isfinite(u)) continue;
 
-            // draw second univariate
-            R  = rng();
-            R2 = double(R >> 11) * rng_const;
+            // acceptance test
+            R2 = uniform_random(rng);
 
-            // rejection method condition
-            if ((R1 <= p) && (R2 <= exp(-u*u))) return u*signe;
-            if ((R1 > p) && (R2 <= exp(u02 - u*u))) return u*signe;
+            if ((R1 <= p) && (R2 <= exp(-u*u))) return u * signe;
+            if ((R1 > p) && (R2 <= exp(u02 - u*u))) return u * signe;
         }
     }
 }
 
-// scatter_mu(): takes photon, rng
-// returns mu = cos(theta) (scattering angle) from RASCAS distribution
+// scatter_mu(): sample scattering angle cosine
+// returns mu = cos(theta) from RASCAS dipole distribution
 double scatter_mu(double x_local, xso::rng& rng) {
-    // generate univariate
-    uint64_t r0 = rng();
-    double r    = double(r0 >> 11) * rng_const;
-
+    double r = uniform_random(rng);
     double A, B;
 
-    if (fabs(x_local) < 0.2)
-    {
-        B = 6 * (2*r - 1);
+    if (fabs(x_local) < 0.2) {
+        B = 6.0 * (2.0 * r - 1.0);
         A = sqrt(B*B + mu_const);
-    }
-    else
-    {
-        B = 4*r - 2;
-        A = sqrt(B*B + 1);
+    } else {
+        B = 4.0 * r - 2.0;
+        A = sqrt(B*B + 1.0);
     }
 
-    return pow(A+B, 1.0/3.0) - pow(A-B, 1.0/3.0);
+    return pow(A + B, 1.0/3.0) - pow(A - B, 1.0/3.0);
 }
 
 
-// scatter(): takes photon, cell indices, radial momentum accumulator
-// changes x, direction by scattering
-// returns radial momentum transfer dp_r (positive = outward momentum to gas)
-double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
-    bool recoil) {
-
+// scatter(): perform resonant scattering in HI atom rest frame
+// updates photon frequency and direction, returns radial momentum transfer
+double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng, bool recoil) {
     double sqrt_T_local = g_grid.sqrt_temp(ix, iy, iz);
-    double vth       = vth_const * sqrt_T_local;
-    double u_bulk_x  = g_grid.velx(ix, iy, iz) / vth;
-    double u_bulk_y  = g_grid.vely(ix, iy, iz) / vth;
-    double u_bulk_z  = g_grid.velz(ix, iy, iz) / vth;
-    
-    // shift photon x value to local bulk frame
-    double dirdotv  = u_bulk_x*phot.dir_x + u_bulk_y*phot.dir_y + u_bulk_z*phot.dir_z;
-    double xlocal   = phot.x - dirdotv;
-    
-    // generate velocity components of scattering atom
+    double vth = vth_const * sqrt_T_local;
+    double u_bulk_x = g_grid.velx(ix, iy, iz) / vth;
+    double u_bulk_y = g_grid.vely(ix, iy, iz) / vth;
+    double u_bulk_z = g_grid.velz(ix, iy, iz) / vth;
+
+    // transform photon frequency to local bulk frame
+    double dirdotv = u_bulk_x * phot.dir_x + u_bulk_y * phot.dir_y + u_bulk_z * phot.dir_z;
+    double xlocal = phot.x - dirdotv;
+
+    // sample velocity of scattering atom
     double u_paral = u_parallel(xlocal, sqrt_T_local, rng);
 
-    // shift photon x value to scatterer's frame
+    // transform to atom rest frame
     xlocal = xlocal - u_paral;
-    
-    // parallel components - sample normal using box-muller
-    uint64_t r1 = rng(); uint64_t r2 = rng();
 
-    double u1 = double(r1 >> 11) * rng_const;
-    double u2 = double(r2 >> 11) * rng_const;
+    // sample perpendicular velocity components using box-muller
+    double u1 = uniform_random(rng);
+    double u2 = uniform_random(rng);
     if (u1 < 1e-16) u1 = 1e-16;
-    
-    double R = sqrt(-log(u1));
-    double theta = two_pi*u2;
 
-    double u_perp1 = R*cos(theta);
-    double u_perp2 = R*sin(theta);
+    double R = sqrt(-log(u1));
+    double theta = two_pi * u2;
+
+    double u_perp1 = R * cos(theta);
+    double u_perp2 = R * sin(theta);
 
     // find basis that velocity components are in
     // a = random vector to cross with phot.dir
@@ -328,19 +360,15 @@ double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
     double inv_e2norm = 1.0 / sqrt(e2x*e2x + e2y*e2y + e2z*e2z);
     e2x *= inv_e2norm; e2y *= inv_e2norm; e2z *= inv_e2norm;
 
-    // dipole/RASCAS scattering angle distribution
+    // sample scattering angle from dipole distribution
     double cosine = scatter_mu(xlocal, rng);
     cosine = max(-1.0, min(1.0, cosine));
-    double sine = sqrt(1.0 - cosine*cosine);
-    
-    // draw univariate to sample phi
-    // (reusing old declarations as a micro-optimization)
-    r1 = rng();
-    u1 = double(r1 >> 11) * rng_const;
-    
-    // pick new direction
-    double phi = u1 * two_pi;
-    double cosphi = cos(phi), sinphi = sin(phi);
+    double sine = sqrt(1.0 - cosine * cosine);
+
+    // sample azimuthal angle uniformly
+    double phi = uniform_random(rng) * two_pi;
+    double cosphi = cos(phi);
+    double sinphi = sin(phi);
     
     // generate new direction vector
     double new_dir_x = cosine*phot.dir_x + sine*(cosphi*e1x + sinphi*e2x);

@@ -50,32 +50,85 @@ constexpr double rng_const   = 1.0/9007199254740992.0;
 static const double sqrt_1_2 = sqrt(1.0/2.0);
 static const double two_pi = 2.0*pi;
 
+// ========== RNG HELPER ========
+
+// uniform_random(): convert xoshiro256** output to [0,1) double
+inline double uniform_random(xso::rng& rng) {
+    return double(rng() >> 11) * rng_const;
+}
+
 // ========== STRUCTURES ==========
+
+// Point source structure
+struct PointSource {
+    double x, y, z;         // Position [cm]
+    double luminosity;      // Photons per second
+};
 
 // 3D grid structure
 struct Grid3D {
-    // Grid dimensions
+    // grid dimensions
     int nx, ny, nz;
 
-    // Grid spacing (cm)
+    // grid spacing [cm]
     double dx, dy, dz;
 
-    // Domain size (cm)
+    // domain size [cm]
     double Lx, Ly, Lz;
 
-    // Cell edges (1D arrays)
+    // cell edges (1D arrays)
     std::vector<double> x_edges, y_edges, z_edges;
 
-    // Cell centers (1D arrays)
+    // cell centers (1D arrays)
     std::vector<double> x_centers, y_centers, z_centers;
 
-    // Physical fields (3D arrays flattened to 1D)
-    std::vector<double> T;         // Temperature [K]
-    std::vector<double> sqrt_T;    // Sqrt Temp [K^0.5]
+    // physical fields (3D arrays flattened to 1D, row-major indexing)
+    std::vector<double> T;         // temperature [K]
+    std::vector<double> sqrt_T;    // sqrt(temperature) [K^0.5]
     std::vector<double> HI;        // HI number density [cm^-3]
-    std::vector<double> vx;        // Bulk velocity [cm/s]
-    std::vector<double> vy;
-    std::vector<double> vz;
+    std::vector<double> vx;        // bulk velocity x-component [cm/s]
+    std::vector<double> vy;        // bulk velocity y-component [cm/s]
+    std::vector<double> vz;        // bulk velocity z-component [cm/s]
+
+    // point sources
+    int n_point_sources;
+    std::vector<PointSource> point_sources;
+
+    // emission from cloud (photons/sec/cell, converted to CDF)
+    std::vector<double> nphot_cloud;
+
+    // total luminosity for normalization
+    double cumulative_luminosity;
+
+    // compute cumulative luminosity and build CDF in place
+    inline void compute_cum_luminosity() {
+        cumulative_luminosity = nphot_cloud[0];
+        for (int i = 1; i < nx * ny * nz; ++i) {
+            cumulative_luminosity += nphot_cloud[i];
+            nphot_cloud[i] += nphot_cloud[i - 1];
+        }
+        for (int i = 0; i < n_point_sources; ++i) {
+            cumulative_luminosity += point_sources[i].luminosity;
+            if (i > 0) point_sources[i].luminosity += point_sources[i - 1].luminosity;
+        }
+    }
+
+    // normalize to CDF for efficient sampling
+    inline void luminosity_cdf() {
+        compute_cum_luminosity();
+
+        // normalize grid CDF to [0, grid_fraction]
+        for (int i = 0; i < nx * ny * nz; ++i) {
+            nphot_cloud[i] = nphot_cloud[i] / cumulative_luminosity;
+        }
+
+        // normalize point source CDF to [grid_fraction, 1.0]
+        for (int i = 0; i < n_point_sources; ++i) {
+            point_sources[i].luminosity = nphot_cloud[nx * ny * nz - 1] +
+                                         point_sources[i].luminosity / cumulative_luminosity;
+            if (i == n_point_sources - 1) point_sources[i].luminosity = 1.0;
+        }
+    }
 
     inline double sqrt_temp(int ix, int iy, int iz) const {
         return sqrt_T[ix*ny*nz + iy*nz + iz];

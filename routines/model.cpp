@@ -77,7 +77,28 @@ void load_grid(const string& path) {
     read_3d(f, "vx", g_grid.vx, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_DOUBLE);
     read_3d(f, "vy", g_grid.vy, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_DOUBLE);
     read_3d(f, "vz", g_grid.vz, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_DOUBLE);
-    
+    read_3d(f, "nphot", g_grid.nphot_cloud, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_DOUBLE);
+
+    // Read point source data
+    g_grid.n_point_sources = 0;
+    read_scalar(f, "n_point_sources", g_grid.n_point_sources);
+
+    if (g_grid.n_point_sources > 0) {
+        vector<double> ps_x, ps_y, ps_z, ps_lum;
+
+        read_1d(f, "point_source_x", ps_x, n_temp);
+        read_1d(f, "point_source_y", ps_y, n_temp);
+        read_1d(f, "point_source_z", ps_z, n_temp);
+        read_1d(f, "point_source_luminosity", ps_lum, n_temp);
+
+        g_grid.point_sources.resize(g_grid.n_point_sources);
+        for (int i = 0; i < g_grid.n_point_sources; ++i) {
+            g_grid.point_sources[i].x = ps_x[i];
+            g_grid.point_sources[i].y = ps_y[i];
+            g_grid.point_sources[i].z = ps_z[i];
+            g_grid.point_sources[i].luminosity = ps_lum[i];
+        }
+    }
     f.close();
 }
 
