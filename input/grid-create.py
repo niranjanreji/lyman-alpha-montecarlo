@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Grid generation script for 3D Monte Carlo Ly-alpha radiative transfer
 Creates a constant-spacing 3D Cartesian grid input file
@@ -6,6 +5,18 @@ Creates a constant-spacing 3D Cartesian grid input file
 
 import numpy as np
 import h5py
+
+# From ApJ 672:48-58, 2008 (Cantalupo et. al - used by RASCAS too)
+def lyalpha_rate_from_recomb(T):
+    return 0.686 - 0.106*np.log(T/10**4) - 0.009*(T/10**4)**(-0.44)
+
+# From MNRAS 292, 27-42, 1992 (Hui, Gnedin - used by RASCAS too)
+def caseb_recomb_coeff(T):
+    return 2.753 * 10**(-14) * ((315614/T)**(1.5)) / ((1.0 + (315614/2.74)**(0.407))**(2.242))
+
+# MNRAS 407, 613-631, 2010 (Goerdt, Dekel, et. al - used by RASCAS too)
+def excitation_rate_coeff(T):
+    return (2.41e-6/T**0.5) * (T/1e4)**0.22 * np.exp(-(10.2)/(8.617333262e-5 * T))
 
 def create_3d_grid():
     """
@@ -57,8 +68,6 @@ def create_3d_grid():
 
     # Create a 3D temperature array
     print(f" Temperatures are set to a constant throughout the grid. Modify T_grid to change this")
-
-    # Since it's so numerically useful, create a 3D sqrt(T) array
     sqrt_T_grid = np.zeros((nx, ny, nz))
     sqrt_T_grid[:,:,:] = 1e2
 
@@ -70,7 +79,25 @@ def create_3d_grid():
             for k in range(nz):
                 r = np.sqrt(x_centers[i]**2 + y_centers[j]**2 + z_centers[k]**2)
                 HI_grid[i, j, k] = 5 if r < Lx/2 else 0
+
+    # Create a 3D free electron number density array
+    ne_grid = np.zeros((nx, ny, nz))
+    for i in range(nx):
+        for j in range(ny):
+            for k in range(nz):
+                ne_grid[i, j, k] = 0
     
+    # Create a 3D ionized hydrogen number density array
+    HII_grid = np.zeros((nx, ny, nz))
+    for i in range(nx):
+        for j in range(ny):
+            for k in range(nz):
+                HII_grid[i, j, k] = 0
+
+    # Create a 3D grid of the ``photon emission rate'' per cell using the RASCAS formula
+    nphot_grid = np.zeros((nx, ny, nz))
+    nphot_grid = dx*dy*dz * ne_grid * (HII_grid*lyalpha_rate_from_recomb(sqrt_T_grid**2)*caseb_recomb_coeff(sqrt_T_grid**2) + HI_grid*excitation_rate_coeff(sqrt_T_grid**2))
+
     # Create a 3D bulk velocity field array
     print(f" Bulk velocity is set to 0 throughout grid. Modify v_grid to change this")
     vx_grid = np.zeros((nx, ny, nz))
@@ -117,6 +144,9 @@ def create_3d_grid():
         f.create_dataset('vx', data=vx_grid)
         f.create_dataset('vy', data=vy_grid)
         f.create_dataset('vz', data=vz_grid)
+
+        # Photon production rates
+        f.create_dataset('nphot', data=nphot_grid)
 
 
         # Grid type metadata
