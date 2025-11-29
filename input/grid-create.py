@@ -57,8 +57,6 @@ def create_3d_grid():
 
     # Create a 3D temperature array
     print(f" Temperatures are set to a constant throughout the grid. Modify T_grid to change this")
-    T_grid = np.zeros((nx, ny, nz))
-    T_grid[:, :, :] = 1e4
 
     # Since it's so numerically useful, create a 3D sqrt(T) array
     sqrt_T_grid = np.zeros((nx, ny, nz))
@@ -114,7 +112,6 @@ def create_3d_grid():
         f.create_dataset('Lz', data=Lz)
 
         # Temperature, Densities, Velocity Field
-        f.create_dataset('T', data=T_grid)
         f.create_dataset('sqrt_T', data=sqrt_T_grid)
         f.create_dataset('HI', data=HI_grid)
         f.create_dataset('vx', data=vx_grid)
