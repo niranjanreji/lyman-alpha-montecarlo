@@ -16,7 +16,7 @@ void init_photon(Photon& phot, xso::rng& rng) {
     phot.pos_x = 0.0;
     phot.pos_y = 0.0;
     phot.pos_z = 0.0;
-
+    
     // sample position from luminosity CDF
     double u = uniform_random(rng);
     int last_idx = g_grid.nx * g_grid.ny * g_grid.nz - 1;

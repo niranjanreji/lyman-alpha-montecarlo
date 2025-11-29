@@ -84,7 +84,7 @@ def create_3d_grid():
             for k in range(nz):
                 r = np.sqrt(x_centers[i]**2 + y_centers[j]**2 + z_centers[k]**2)
                 HI_grid[i, j, k] = 5.0 if r < Lx/2 else 0.0
-    print(f"  HI density       : uniform sphere, n_HI = 5 cm⁻³")
+    print(f"  HI density       : uniform sphere, n_HI = 5 cm^-3")
 
     # Ionization state (no ionization in this example)
     ne_grid = np.zeros((nx, ny, nz))

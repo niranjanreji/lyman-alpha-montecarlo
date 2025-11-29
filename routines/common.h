@@ -117,6 +117,11 @@ struct Grid3D {
     inline void luminosity_cdf() {
         compute_cum_luminosity();
 
+        // safety check: if no emission anywhere, nothing to normalize
+        if (cumulative_luminosity < 1e-30) {
+            return;
+        }
+
         // normalize grid CDF to [0, grid_fraction]
         for (int i = 0; i < nx * ny * nz; ++i) {
             nphot_cloud[i] = nphot_cloud[i] / cumulative_luminosity;
@@ -170,7 +175,7 @@ extern Grid3D g_grid;
 
 // ========== FUNCTION DECLARATIONS ==========
 
-// Grid functions
+// grid functions
 void load_grid(const std::string& path);
 
 double voigt(double x, double sqrt_T);
@@ -194,7 +199,7 @@ double scatter_mu(double x_local, xso::rng& rng);
 double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
                bool recoil = true);
 
-// Monte Carlo simulation
+// monte Carlo simulation
 void monte_carlo(int max_photon_count = 100000, bool recoil = true);
 
 #endif // COMMON_H

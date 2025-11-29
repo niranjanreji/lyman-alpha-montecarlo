@@ -63,6 +63,12 @@ int main(int argc, char* argv[]) {
         cout << "  Grid dimensions: " << g_grid.nx << " x " << g_grid.ny << " x " << g_grid.nz << "\n";
         cout << "  Domain size: " << g_grid.Lx << " x " << g_grid.Ly << " x " << g_grid.Lz << " cm\n";
         cout << "  Cell size: " << g_grid.dx << " x " << g_grid.dy << " x " << g_grid.dz << " cm\n";
+
+        // build luminosity CDF for photon sampling
+        cout << "  Building luminosity CDF...\n";
+        g_grid.luminosity_cdf();
+        cout << "  Total luminosity: " << g_grid.cumulative_luminosity << " photons/s\n";
+        cout << "  Point sources: " << g_grid.n_point_sources << "\n";
     } catch (const exception& e) {
         cerr << "Error loading grid: " << e.what() << "\n";
         return 1;
