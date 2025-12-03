@@ -108,7 +108,22 @@ def create_3d_grid():
         print(f"  Point sources    : {len(point_sources)} source(s)")
         for i, ps in enumerate(point_sources):
             print(f"                     [{i}] ({ps[0]:.1e}, {ps[1]:.1e}, {ps[2]:.1e}) "
-                  f"→ {ps[3]:.2e} photons/s")
+                  f"-> {ps[3]:.2e} photons/s")
+            
+    # Photon ``queue'' information
+    phot_grid_size = 1000
+
+    phot_x_grid = np.zeros(phot_grid_size)
+
+    phot_pos_x_grid = np.zeros(phot_grid_size)
+    phot_pos_y_grid = np.zeros(phot_grid_size)
+    phot_pos_z_grid = np.zeros(phot_grid_size)
+
+    phot_dir_x_grid = np.zeros(phot_grid_size)
+    phot_dir_y_grid = np.zeros(phot_grid_size)
+    phot_dir_z_grid = np.zeros(phot_grid_size)
+
+    phot_sqrt_temp_grid = np.zeros(phot_grid_size)
 
     # Bulk velocity field (zero in this example)
     print(f"  Bulk velocities  : zero (v_x = v_y = v_z = 0)")
@@ -174,6 +189,21 @@ def create_3d_grid():
             f.create_dataset('point_source_y', data=ps_y)
             f.create_dataset('point_source_z', data=ps_z)
             f.create_dataset('point_source_luminosity', data=ps_n)
+
+        # Photon information we want to evolve
+        f.create_dataset('n_photons', data=phot_grid_size)
+
+        if phot_grid_size > 0:
+            f.create_dataset('photon_pos_x', data=phot_pos_x_grid)
+            f.create_dataset('photon_pos_y', data=phot_pos_y_grid)
+            f.create_dataset('photon_pos_z', data=phot_pos_z_grid)
+
+            f.create_dataset('photon_dir_x', data=phot_dir_x_grid)
+            f.create_dataset('photon_dir_y', data=phot_dir_y_grid)
+            f.create_dataset('photon_dir_z', data=phot_dir_z_grid)
+
+            f.create_dataset('photon_x', data=phot_x_grid)
+            f.create_dataset('photon_sqrt_temp', data=phot_sqrt_temp_grid)
 
         # Grid type metadata
         f.attrs['grid_type'] = 'uniform_cartesian'

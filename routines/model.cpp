@@ -45,33 +45,33 @@ void read_3d(H5File& f, const char* name, vector<T>& v,
 void load_grid(const string& path) {
     H5File f(path, H5F_ACC_RDONLY);
 
-    // Read grid dimensions
+    // read grid dimensions
     read_scalar(f, "nx", g_grid.nx);
     read_scalar(f, "ny", g_grid.ny);
     read_scalar(f, "nz", g_grid.nz);
 
-    // Read grid spacing
+    // read grid spacing
     read_scalar(f, "dx", g_grid.dx, PredType::NATIVE_DOUBLE);
     read_scalar(f, "dy", g_grid.dy, PredType::NATIVE_DOUBLE);
     read_scalar(f, "dz", g_grid.dz, PredType::NATIVE_DOUBLE);
 
-    // Read domain size
+    // read domain size
     read_scalar(f, "Lx", g_grid.Lx, PredType::NATIVE_DOUBLE);
     read_scalar(f, "Ly", g_grid.Ly, PredType::NATIVE_DOUBLE);
     read_scalar(f, "Lz", g_grid.Lz, PredType::NATIVE_DOUBLE);
 
-    // Read cell edges
+    // read cell edges
     int n_temp;
     read_1d(f, "x_edges", g_grid.x_edges, n_temp);
     read_1d(f, "y_edges", g_grid.y_edges, n_temp);
     read_1d(f, "z_edges", g_grid.z_edges, n_temp);
     
-    // Read cell centers
+    // read cell centers
     read_1d(f, "x_centers", g_grid.x_centers, n_temp);
     read_1d(f, "y_centers", g_grid.y_centers, n_temp);
     read_1d(f, "z_centers", g_grid.z_centers, n_temp);
     
-    // Read 3D physical fields
+    // read 3D physical fields
     read_3d(f, "sqrt_T", g_grid.sqrt_T, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_DOUBLE);
     read_3d(f, "HI", g_grid.HI, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_DOUBLE);
     read_3d(f, "vx", g_grid.vx, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_DOUBLE);
@@ -79,7 +79,7 @@ void load_grid(const string& path) {
     read_3d(f, "vz", g_grid.vz, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_DOUBLE);
     read_3d(f, "nphot", g_grid.nphot_cloud, g_grid.nx, g_grid.ny, g_grid.nz, PredType::NATIVE_DOUBLE);
 
-    // Read point source data
+    // read point source data
     g_grid.n_point_sources = 0;
     read_scalar(f, "n_point_sources", g_grid.n_point_sources);
 
@@ -99,6 +99,36 @@ void load_grid(const string& path) {
             g_grid.point_sources[i].luminosity = ps_lum[i];
         }
     }
+
+    // if photons (locations, dirs) are provided in grid file, load
+    int photons = 0;
+    read_scalar(f, "n_photons", photons);
+
+    if (photons > 0) {
+        vector<double> phot_pos_x, phot_pos_y, phot_pos_z;
+        vector<double> phot_dir_x, phot_dir_y, phot_dir_z;
+        vector<double> phot_x, phot_sqrt_temp;
+
+        read_1d(f, "photon_pos_x", phot_pos_x, n_temp);
+        read_1d(f, "photon_pos_y", phot_pos_y, n_temp);
+        read_1d(f, "photon_pos_z", phot_pos_z, n_temp);
+
+        read_1d(f, "photon_dir_x", phot_dir_x, n_temp);
+        read_1d(f, "photon_dir_y", phot_dir_y, n_temp);
+        read_1d(f, "photon_dir_z", phot_dir_z, n_temp);
+
+        read_1d(f, "photon_x", phot_x, n_temp);
+        read_1d(f, "photon_sqrt_temp", phot_sqrt_temp, n_temp);
+
+        // push photons into queue
+        for (int i = 0; i < photons; ++i) {
+            Photon phot;
+            photon_queue.emplace(phot_pos_x[i], phot_pos_y[i], phot_pos_z[i],
+                                 phot_dir_x[i], phot_dir_y[i], phot_dir_z[i],
+                                 phot_x[i], phot_sqrt_temp[i]);
+        }
+    }
+
     f.close();
 }
 

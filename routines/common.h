@@ -3,6 +3,7 @@
 
 #define _USE_MATH_DEFINES
 #include <cmath>
+#include <queue>
 #include <vector>
 #include <string>
 #include <random>
@@ -164,14 +165,21 @@ struct Photon {
     // photon frequency
     double x;
 
-    // location
-    int curr_i, curr_j, curr_k;
-
     // temperature where x is valid
     double local_sqrt_temp;
+
+    // default constructor
+    Photon(double dx = 0, double dy = 0, double dz = 0,
+           double px = 0, double py = 0, double pz = 0,
+           double freq = 0, double temp = 100)
+        : dir_x(dx), dir_y(dy), dir_z(dz),
+          pos_x(px), pos_y(py), pos_z(pz),
+          x(freq), local_sqrt_temp(temp) {}
 };
 
 extern Grid3D g_grid;
+
+extern std::queue<Photon> photon_queue;
 
 // ========== FUNCTION DECLARATIONS ==========
 

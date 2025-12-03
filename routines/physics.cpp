@@ -20,53 +20,54 @@ void init_photon(Photon& phot, xso::rng& rng) {
     // sample position from luminosity CDF
     double u = uniform_random(rng);
     int last_idx = g_grid.nx * g_grid.ny * g_grid.nz - 1;
+    if (g_grid.cumulative_luminosity > 0) {
+        if (u <= g_grid.nphot_cloud[last_idx]) {
+            // sample from photon cloud using binary search on CDF
+            int left = 0;
+            int right = last_idx;
 
-    if (u <= g_grid.nphot_cloud[last_idx]) {
-        // sample from photon cloud using binary search on CDF
-        int left = 0;
-        int right = last_idx;
-
-        while (left < right) {
-            int mid = left + (right - left) / 2;
-            if (g_grid.nphot_cloud[mid] < u) {
-                left = mid + 1;
-            } else {
-                right = mid;
+            while (left < right) {
+                int mid = left + (right - left) / 2;
+                if (g_grid.nphot_cloud[mid] < u) {
+                    left = mid + 1;
+                } else {
+                    right = mid;
+                }
             }
-        }
 
-        // convert 1D index to 3D cell indices
-        int cell_idx = left;
-        int iz = cell_idx % g_grid.nz;
-        int iy = (cell_idx / g_grid.nz) % g_grid.ny;
-        int ix = cell_idx / (g_grid.ny * g_grid.nz);
+            // convert 1D index to 3D cell indices
+            int cell_idx = left;
+            int iz = cell_idx % g_grid.nz;
+            int iy = (cell_idx / g_grid.nz) % g_grid.ny;
+            int ix = cell_idx / (g_grid.ny * g_grid.nz);
 
-        // sample uniform position within selected cell
-        double ux = uniform_random(rng);
-        double uy = uniform_random(rng);
-        double uz = uniform_random(rng);
+            // sample uniform position within selected cell
+            double ux = uniform_random(rng);
+            double uy = uniform_random(rng);
+            double uz = uniform_random(rng);
 
-        phot.pos_x = g_grid.x_edges[ix] + ux * g_grid.dx;
-        phot.pos_y = g_grid.y_edges[iy] + uy * g_grid.dy;
-        phot.pos_z = g_grid.z_edges[iz] + uz * g_grid.dz;
-    } else {
-        // sample from point sources using binary search on CDF
-        int left = 0;
-        int right = g_grid.n_point_sources - 1;
+            phot.pos_x = g_grid.x_edges[ix] + ux * g_grid.dx;
+            phot.pos_y = g_grid.y_edges[iy] + uy * g_grid.dy;
+            phot.pos_z = g_grid.z_edges[iz] + uz * g_grid.dz;
+        } else {
+            // sample from point sources using binary search on CDF
+            int left = 0;
+            int right = g_grid.n_point_sources - 1;
 
-        while (left < right) {
-            int mid = left + (right - left) / 2;
-            if (g_grid.point_sources[mid].luminosity < u) {
-                left = mid + 1;
-            } else {
-                right = mid;
+            while (left < right) {
+                int mid = left + (right - left) / 2;
+                if (g_grid.point_sources[mid].luminosity < u) {
+                    left = mid + 1;
+                } else {
+                    right = mid;
+                }
             }
-        }
 
-        // place photon at exact point source location
-        phot.pos_x = g_grid.point_sources[left].x;
-        phot.pos_y = g_grid.point_sources[left].y;
-        phot.pos_z = g_grid.point_sources[left].z;
+            // place photon at exact point source location
+            phot.pos_x = g_grid.point_sources[left].x;
+            phot.pos_y = g_grid.point_sources[left].y;
+            phot.pos_z = g_grid.point_sources[left].z;
+        }
     }
 
     // sample isotropic direction
