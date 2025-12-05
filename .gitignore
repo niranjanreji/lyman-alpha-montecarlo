@@ -1,6 +1,2 @@
 input/grid.h5
-output/momentum_profile.txt
-output/spectrum.txt
-output/plot_spectrum.py
-output/plot_momentum.py
 output/test.py
