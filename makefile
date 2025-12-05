@@ -4,19 +4,31 @@
 # Compilers and flags
 CXX ?= clang++
 CXXFLAGS = -std=c++20 -O3 -fopenmp
-LIBS = -lhdf5_cpp -lhdf5
+TARGET ?= mc.exe
+
+# OS-dependent HDF5 libraries
+ifeq ($(OS),Windows_NT)
+    LIBS = -lhdf5_cpp -lhdf5
+else
+    UNAME_S := $(shell uname -s)
+    ifeq ($(UNAME_S),Linux)
+        LIBS = -lhdf5_serial_cpp -lhdf5_serial
+    else ifeq ($(UNAME_S),Darwin)
+        LIBS = -lhdf5_cpp -lhdf5
+    endif
+endif
 
 # Default target
 all: help
 
 # CPU build
 cpu:
-	$(CXX) $(CXXFLAGS) -o mc.exe main.cpp $(LIBS)
-	@echo CPU compilation successful!
+	$(CXX) $(CXXFLAGS) -o $(TARGET) main.cpp $(LIBS)
+	@echo CPU compilation successful! Output: $(TARGET)
 
 # Clean
 clean:
-	-@rm -f mc.exe *.o
+	-@rm -f $(TARGET) mc.exe *.o
 	@echo Clean complete.
 
 # Help
