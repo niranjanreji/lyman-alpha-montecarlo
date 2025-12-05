@@ -11,6 +11,7 @@ using namespace H5;
 
 
 Grid3D g_grid;
+std::queue<Photon> photon_queue;
 
 // ========== 3D GRID GLOBALS ==========
 

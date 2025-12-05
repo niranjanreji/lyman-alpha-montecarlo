@@ -51,13 +51,12 @@ void monte_carlo(int max_photon_count, bool recoil) {
             get_cell_indices(phot, ix, iy, iz);
             phot.local_sqrt_temp = g_grid.sqrt_temp(ix, iy, iz);
             int n_scatters = 0;
-            int max_scat = 10000000;  // debug code
 
             // pre-allocate mem for while loop variables
             uint64_t R;
             double r, tau, dp_r, r_scatter;
             int bin_idx;
-            while (!escaped(phot) && n_scatters < max_scat)
+            while (!escaped(phot))
             {
                 // draw random optical depth
                 R   = rng_local();

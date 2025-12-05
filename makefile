@@ -4,7 +4,7 @@
 # Compilers and flags
 CXX ?= clang++
 CXXFLAGS = -std=c++20 -O3 -fopenmp
-LIBS = -lhdf5_cpp -lhdf5 -lszip -lzlib
+LIBS = -lhdf5_cpp -lhdf5
 
 # Default target
 all: help
