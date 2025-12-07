@@ -205,7 +205,7 @@ double u_parallel(double x_local, double sqrt_T_local, xso::rng& rng);
 double scatter_mu(double x_local, xso::rng& rng);
 
 double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng,
-               bool recoil = true);
+               bool recoil = true, bool isotropic = false);
 
 // monte Carlo simulation
 void monte_carlo(int max_photon_count = 100000, bool recoil = true);

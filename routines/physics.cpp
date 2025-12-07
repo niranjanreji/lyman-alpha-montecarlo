@@ -311,7 +311,7 @@ double scatter_mu(double x_local, xso::rng& rng) {
 
 // scatter(): perform resonant scattering in HI atom rest frame
 // updates photon frequency and direction, returns radial momentum transfer
-double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng, bool recoil) {
+double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng, bool recoil, bool isotropic) {
     double sqrt_T_local = g_grid.sqrt_temp(ix, iy, iz);
     double vth = vth_const * sqrt_T_local;
     double u_bulk_x = g_grid.velx(ix, iy, iz) / vth;
@@ -362,7 +362,9 @@ double scatter(Photon& phot, int ix, int iy, int iz, xso::rng& rng, bool recoil)
     e2x *= inv_e2norm; e2y *= inv_e2norm; e2z *= inv_e2norm;
 
     // sample scattering angle from dipole distribution
-    double cosine = scatter_mu(xlocal, rng);
+    double cosine;
+    if (!isotropic) cosine = scatter_mu(xlocal, rng);
+    else cosine = uniform_random(rng)*2 - 1;
     cosine = max(-1.0, min(1.0, cosine));
     double sine = sqrt(1.0 - cosine * cosine);
 
