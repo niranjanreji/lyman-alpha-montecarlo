@@ -1,231 +1,148 @@
-"""
-Grid generation script for 3D Monte Carlo Ly-alpha radiative transfer
-Creates a constant-spacing 3D Cartesian grid input file
-"""
+# ------------------------------------------------------------------
+# usage: python create_grid.py grid.h5
+# creates static file with geometry and
+# initial physical fields
+# ------------------------------------------------------------------
 
-import numpy as np
+import sys
 import h5py
+import datetime
+import numpy as np
 
-# From ApJ 672:48-58, 2008 (Cantalupo et. al - used by RASCAS too)
+# ------------------------------------------------------------------
+# the functions here are used by RASCSAS
+# lya rate from recomb: ApJ 672:48-58, 2008
+# case b recomb coeffi: MNRAS 292, 27-42, 1992
+# excitation rate coef: MNRAS 407, 613-631, 2010
+# ------------------------------------------------------------------
+
 def lyalpha_rate_from_recomb(T):
     return 0.686 - 0.106*np.log(T/10**4) - 0.009*(T/10**4)**(-0.44)
 
-# From MNRAS 292, 27-42, 1992 (Hui, Gnedin - used by RASCAS too)
 def caseb_recomb_coeff(T):
-    return 2.753 * 10**(-14) * ((315614/T)**(1.5)) / ((1.0 + (315614/2.74)**(0.407))**(2.242))
+    return 2.753e-14 * ((315614/T)**(1.5)) / ((1.0 + (315614/2.74)**(0.407))**(2.242))
 
-# MNRAS 407, 613-631, 2010 (Goerdt, Dekel, et. al - used by RASCAS too)
 def excitation_rate_coeff(T):
     return (2.41e-6/T**0.5) * (T/1e4)**0.22 * np.exp(-(10.2)/(8.617333262e-5 * T))
 
-def create_3d_grid():
-    """
-    Creates a uniform 3D Cartesian grid for Monte Carlo simulation.
-    Also creates a temperature grid simultaneously.
-    Prompts user for grid parameters and saves to HDF5 file.
-    """
 
-    print("\n" + "=" * 70)
-    print(" " * 10 + "3D Grid Generator for Ly-alpha Monte Carlo")
-    print("=" * 70)
+fname = sys.argv[1]
 
-    # Get grid parameters from user
-    print("\nGrid Parameters")
-    print("-" * 70)
+# grid resolution and domain (cm)
+nx, ny, nz = 100, 100, 100
+Lx, Ly, Lz = 6e18, 6e18, 6e18
+dx, dy, dz = Lx/nx, Ly/ny, Lz/nz
 
-    # Number of cells in each dimension
-    nx = int(input("  Number of cells in x-direction: "))
-    ny = int(input("  Number of cells in y-direction: "))
-    nz = int(input("  Number of cells in z-direction: "))
+x_edges = np.linspace(-Lx/2, Lx/2, nx+1)
+y_edges = np.linspace(-Ly/2, Ly/2, ny+1)
+z_edges = np.linspace(-Lz/2, Lz/2, nz+1)
 
-    # Grid spacing in each dimension (in cm, CGS units)
-    dx = float(input("  Grid spacing in x-direction (cm): "))
-    dy = float(input("  Grid spacing in y-direction (cm): "))
-    dz = float(input("  Grid spacing in z-direction (cm): "))
+x_centr = 0.5 * (x_edges[:-1] + x_edges[1:])
+y_centr = 0.5 * (y_edges[:-1] + y_edges[1:])
+z_centr = 0.5 * (z_edges[:-1] + z_edges[1:])
 
-    # Calculate domain size
-    Lx = nx * dx
-    Ly = ny * dy
-    Lz = nz * dz
+print("\nGrid Configuration")
+print("-" * 70)
+print(f"  Grid dimensions  : {nx} * {ny} * {nz} = {nx*ny*nz:,} cells")
+print(f"  Cell spacing     : dx = {dx:.2e} cm")
+print(f"                     dy = {dy:.2e} cm")
+print(f"                     dz = {dz:.2e} cm")
+print(f"  Domain size      : {Lx:.2e} * {Ly:.2e} * {Lz:.2e} cm^3")
+print(f"  Cell volume      : {dx*dy*dz:.2e} cm^3")
+print("-" * 70)
 
-    print("\nGrid Configuration")
-    print("-" * 70)
-    print(f"  Grid dimensions  : {nx} * {ny} * {nz} = {nx*ny*nz:,} cells")
-    print(f"  Cell spacing     : dx = {dx:.2e} cm")
-    print(f"                     dy = {dy:.2e} cm")
-    print(f"                     dz = {dz:.2e} cm")
-    print(f"  Domain size      : {Lx:.2e} * {Ly:.2e} * {Lz:.2e} cm^3")
-    print(f"  Cell volume      : {dx*dy*dz:.2e} cm^3")
-    print("-" * 70)
+# create neutral hydrogen field
+hi = np.zeros((nx, ny, nz))
+for i in range(nx):
+    for j in range(ny):
+        for k in range(nz):
+            r = np.sqrt(x_centr[i]**2 + y_centr[j]**2 + z_centr[k]**2)
+            hi[i, j, k] = 5.0 if r < 3e18 else 0.0
 
-    # Create cell-centered coordinate arrays
-    # Grid is centered at origin
-    x_edges = np.linspace(-Lx/2, Lx/2, nx + 1)
-    y_edges = np.linspace(-Ly/2, Ly/2, ny + 1)
-    z_edges = np.linspace(-Lz/2, Lz/2, nz + 1)
+# create ionization state grids
+ne  = np.zeros((nx, ny, nz))
+hii = np.zeros((nx, ny, nz))
 
-    # Cell centers
-    x_centers = 0.5 * (x_edges[:-1] + x_edges[1:])
-    y_centers = 0.5 * (y_edges[:-1] + y_edges[1:])
-    z_centers = 0.5 * (z_edges[:-1] + z_edges[1:])
+# create temperature and velocity fields
+vx = np.zeros((nx, ny, nz), dtype=np.float64)
+vy = np.zeros((nx, ny, nz), dtype=np.float64)
+vz = np.zeros((nx, ny, nz), dtype=np.float64)
 
-    # Create physical field arrays
-    print("\nPhysical Fields")
-    print("-" * 70)
+sqrt_temp = np.full((nx, ny, nz), 1e2, dtype=np.int16)
 
-    # Temperature field (constant in this example)
-    sqrt_T_grid = np.full((nx, ny, nz), 1e2)
-    print(f"  Temperature      : constant T = {1e4:.1e} K (sqrt(T) = {1e2:.1e} K^0.5)")
+# photon emission per cell using RASCAS formula
+nphot = (dx*dy*dz * ne * (hii * lyalpha_rate_from_recomb(sqrt_temp**2)*caseb_recomb_coeff(sqrt_temp**2)
+                           + hi * excitation_rate_coeff(sqrt_temp**2)))
+total_grid_lum = np.sum(nphot)
 
-    # HI number density field (uniform sphere in this example)
-    HI_grid = np.zeros((nx, ny, nz))
-    for i in range(nx):
-        for j in range(ny):
-            for k in range(nz):
-                r = np.sqrt(x_centers[i]**2 + y_centers[j]**2 + z_centers[k]**2)
-                HI_grid[i, j, k] = 5.0 if r < Lx/2 else 0.0
-    print(f"  HI density       : uniform sphere, n_HI = 5 cm^-3")
+# point source information (x, y, z, photons/sec)
+ps_posx = [0]
+ps_posy = [0]
+ps_posz = [0]
 
-    # Ionization state (no ionization in this example)
-    ne_grid = np.zeros((nx, ny, nz))
-    HII_grid = np.zeros((nx, ny, nz))
-    print(f"  Ionization       : neutral (n_e = n_HII = 0)")
+ps_lumi = [1e50]
 
-    # Photon emission rate using RASCAS formula
-    nphot_grid = (dx * dy * dz * ne_grid *
-                  (HII_grid * lyalpha_rate_from_recomb(sqrt_T_grid**2) *
-                   caseb_recomb_coeff(sqrt_T_grid**2) +
-                   HI_grid * excitation_rate_coeff(sqrt_T_grid**2)))
-    total_grid_lum = np.sum(nphot_grid)
-    print(f"  Grid emission    : {total_grid_lum:.2e} photons/s")
+# write hdf5 file
+with h5py.File(fname, "w") as f:
+    # ------------------------------------------------------------------
+    # /grid group: geometry only
+    # ------------------------------------------------------------------
 
-    # Point sources (modify as needed)
-    point_sources = [
-        (0.0, 0.0, 0.0, 1e50)  # central point source
-    ]
+    g = f.create_group("grid")
 
-    if point_sources:
-        print(f"  Point sources    : {len(point_sources)} source(s)")
-        for i, ps in enumerate(point_sources):
-            print(f"                     [{i}] ({ps[0]:.1e}, {ps[1]:.1e}, {ps[2]:.1e}) "
-                  f"-> {ps[3]:.2e} photons/s")
-            
-    # Photon ``queue'' information
-    phot_grid_size = 1000
+    g.create_dataset("x_edges", data=x_edges)
+    g.create_dataset("y_edges", data=y_edges)
+    g.create_dataset("z_edges", data=z_edges)
 
-    phot_x_grid = np.zeros(phot_grid_size)
+    g.attrs["Lx"] = Lx
+    g.attrs["Ly"] = Ly
+    g.attrs["Lz"] = Lz
+    g.attrs["nx"] = nx
+    g.attrs["ny"] = ny
+    g.attrs["nz"] = nz
+    g.attrs["dx"] = dx
+    g.attrs["dy"] = dy
+    g.attrs["dz"] = dz
+    g.attrs["units"] = "cgs"
+    g.attrs["version"] = 1
 
-    phot_pos_x_grid = np.zeros(phot_grid_size)
-    phot_pos_y_grid = np.zeros(phot_grid_size)
-    phot_pos_z_grid = np.zeros(phot_grid_size)
+    # ------------------------------------------------------------------
+    # /fields group: physical cell data (static or initial)
+    # ------------------------------------------------------------------
 
-    phot_dir_x_grid = np.zeros(phot_grid_size)
-    phot_dir_y_grid = np.zeros(phot_grid_size)
-    phot_dir_z_grid = np.zeros(phot_grid_size)
+    fld = f.create_group("fields")
 
-    phot_sqrt_temp_grid = np.zeros(phot_grid_size)
+    fld.create_dataset("vx", data=vx, compression="gzip")
+    fld.create_dataset("vy", data=vy, compression="gzip")
+    fld.create_dataset("vz", data=vz, compression="gzip")
 
-    # Bulk velocity field (zero in this example)
-    print(f"  Bulk velocities  : zero (v_x = v_y = v_z = 0)")
-    print("-" * 70)
-    vx_grid = np.zeros((nx, ny, nz))
-    vy_grid = np.zeros((nx, ny, nz))
-    vz_grid = np.zeros((nx, ny, nz))
+    #fld.create_dataset("ne", data=ne, compression="gzip")
+    fld.create_dataset("n_HI", data=hi, compression="gzip")
+    #fld.create_dataset("HII", data=hii, compression="gzip")
 
-    # Save to HDF5 file
-    print("\nSaving to HDF5")
-    print("-" * 70)
-    output_file = "grid.h5"
-    print(f"  Output file      : {output_file}")
+    fld.create_dataset("nphot", data=nphot, compression="gzip")
+    fld.create_dataset("sqrt_temp", data=sqrt_temp, compression="gzip")
 
-    with h5py.File(output_file, 'w') as f:
-        # Grid dimensions
-        f.create_dataset('nx', data=nx)
-        f.create_dataset('ny', data=ny)
-        f.create_dataset('nz', data=nz)
+    fld.attrs["grid_luminosity"] = total_grid_lum
 
-        # Grid spacing
-        f.create_dataset('dx', data=dx)
-        f.create_dataset('dy', data=dy)
-        f.create_dataset('dz', data=dz)
+    # ------------------------------------------------------------------
+    # /sources group: point source locations, information
+    # ------------------------------------------------------------------
 
-        # Cell edges (for boundary checking)
-        f.create_dataset('x_edges', data=x_edges)
-        f.create_dataset('y_edges', data=y_edges)
-        f.create_dataset('z_edges', data=z_edges)
+    src = f.create_group("sources")
+    src.attrs["num"] = len(ps_posx)
+    src.attrs["total_luminosity"] = sum(ps_lumi)
 
-        # Cell centers (for evaluation of physical quantities)
-        f.create_dataset('x_centers', data=x_centers)
-        f.create_dataset('y_centers', data=y_centers)
-        f.create_dataset('z_centers', data=z_centers)
+    src.create_dataset("ps_posx", data=ps_posx)
+    src.create_dataset("ps_posy", data=ps_posy)
+    src.create_dataset("ps_posz", data=ps_posz)
 
-        # Domain size
-        f.create_dataset('Lx', data=Lx)
-        f.create_dataset('Ly', data=Ly)
-        f.create_dataset('Lz', data=Lz)
+    src.create_dataset("ps_luminosity", data=ps_lumi)
 
-        # Temperature, Densities, Velocity Field
-        f.create_dataset('sqrt_T', data=sqrt_T_grid)
-        f.create_dataset('HI', data=HI_grid)
-        f.create_dataset('vx', data=vx_grid)
-        f.create_dataset('vy', data=vy_grid)
-        f.create_dataset('vz', data=vz_grid)
+    # ------------------------------------------------------------------
+    # some metadata
+    # ------------------------------------------------------------------
 
-        # Photon production rates (per second)
-        f.create_dataset('nphot', data=nphot_grid)
-
-        # Point sources
-        n_sources = len(point_sources)
-        f.create_dataset('n_point_sources', data=n_sources)
-
-        if n_sources > 0:
-            # Separate arrays for each property
-            ps_x = np.array([ps[0] for ps in point_sources], dtype=np.float64)
-            ps_y = np.array([ps[1] for ps in point_sources], dtype=np.float64)
-            ps_z = np.array([ps[2] for ps in point_sources], dtype=np.float64)
-            ps_n = np.array([ps[3] for ps in point_sources], dtype=np.float64)
-
-            f.create_dataset('point_source_x', data=ps_x)
-            f.create_dataset('point_source_y', data=ps_y)
-            f.create_dataset('point_source_z', data=ps_z)
-            f.create_dataset('point_source_luminosity', data=ps_n)
-
-        # Photon information we want to evolve
-        f.create_dataset('n_photons', data=phot_grid_size)
-
-        if phot_grid_size > 0:
-            f.create_dataset('photon_pos_x', data=phot_pos_x_grid)
-            f.create_dataset('photon_pos_y', data=phot_pos_y_grid)
-            f.create_dataset('photon_pos_z', data=phot_pos_z_grid)
-
-            f.create_dataset('photon_dir_x', data=phot_dir_x_grid)
-            f.create_dataset('photon_dir_y', data=phot_dir_y_grid)
-            f.create_dataset('photon_dir_z', data=phot_dir_z_grid)
-
-            f.create_dataset('photon_x', data=phot_x_grid)
-            f.create_dataset('photon_sqrt_temp', data=phot_sqrt_temp_grid)
-
-        # Grid type metadata
-        f.attrs['grid_type'] = 'uniform_cartesian'
-        f.attrs['coordinate_system'] = 'cartesian'
-        f.attrs['units'] = 'cgs'
-        f.attrs['description'] = '3D uniform Cartesian grid for Ly-alpha Monte Carlo'
-
-    print(f"  Status           : successfully written")
-    print("-" * 70)
-
-    # Print summary
-    print("\nSummary")
-    print("-" * 70)
-    print(f"  Total cells      : {nx * ny * nz:,}")
-    print(f"  x range          : [{x_edges[0]:.2e}, {x_edges[-1]:.2e}] cm")
-    print(f"  y range          : [{y_edges[0]:.2e}, {y_edges[-1]:.2e}] cm")
-    print(f"  z range          : [{z_edges[0]:.2e}, {z_edges[-1]:.2e}] cm")
-    total_lum = total_grid_lum + sum([ps[3] for ps in point_sources])
-    print(f"  Total luminosity : {total_lum:.2e} photons/s")
-    print("=" * 70)
-    print()
-
-
-if __name__ == "__main__":
-    create_3d_grid()
+    f.attrs["creator"] = "grid_create.py"
+    f.attrs["timestamp"] = datetime.datetime.now().isoformat()
+    f.attrs["desc"] = "Input grid file for Ly-alpha RT"

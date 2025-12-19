@@ -6,17 +6,19 @@ TEST_SCATTER.CPP / NIRANJAN REJI
 #include <iostream>
 #include <cassert>
 
-#include "../../routines/common.h"
-#include "../../routines/model.cpp"
-#include "../../routines/physics.cpp"
+#include "../../src/common.h"
+#include "../../src/grid.cpp"
+#include "../../src/physics.cpp"
 using namespace std;
 
 int main(int argc, char** argv) {
     // initialize test grid (1 voxel)
-    g_grid.sqrt_T.resize(1);
-    g_grid.vx.resize(1);
-    g_grid.vy.resize(1);
-    g_grid.vz.resize(1);
+    Grid *g = new Grid();
+    
+    g->sqrt_temp.resize(1);
+    g->vx.resize(1);
+    g->vy.resize(1);
+    g->vz.resize(1);
 
     // tunable scatter test parameters
     int num_samples = 3000000;        // no. of samples per input x value
@@ -25,8 +27,8 @@ int main(int argc, char** argv) {
     bool recoil = false;
     bool isotropic = true;
 
-    g_grid.sqrt_T[0] = sqrt_T;
-    g_grid.vx[0] = 0; g_grid.vy[0] = 0; g_grid.vz[0] = 0;
+    g->sqrt_temp[0] = sqrt_T;
+    g->vx[0] = 0; g->vy[0] = 0; g->vz[0] = 0;
 
     vector<double> xins = {0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 8.0};
 
@@ -43,7 +45,10 @@ int main(int argc, char** argv) {
             phot.dir_y = 0; phot.dir_z = 0;
             phot.pos_x = 0; phot.pos_y = 0; phot.pos_z = 0;
 
-            scatter(phot, 0, 0, 0, rng, recoil, isotropic);
+            vector<double> mom_x, mom_y, mom_z;
+            mom_x.resize(1); mom_y.resize(1); mom_z.resize(1);
+
+            scatter(phot, *g, mom_x, mom_y, mom_z, rng, recoil, isotropic);
 
             fo << phot.x << "\n";
         }
