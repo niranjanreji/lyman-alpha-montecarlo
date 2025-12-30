@@ -9,7 +9,6 @@ int main () {
 
     Grid* grid = load_grid(fname);
     Photons* p = new Photons();
-
-    cout << "ur a gerbert" << endl;
-    monte_carlo(*p, *grid, 1e20, 1000, true);
+    
+    monte_carlo(*p, *grid, 1e20, 100, true);
 }

@@ -272,7 +272,7 @@ Real u_parallel(Real x, Real sqrt_temp, xso::rng& rng) {
 
         Real theta0 = atan((u0 - xabs) / a);
         Real u02 = u0*u0;
-        Real eu0 = fast_exp(-u02);
+        Real eu0 = exp(-u02);
         Real p   = (theta0 + pi/2) / ((1 - eu0)*theta0 + (1 + eu0)*pi/2);
 
         Real R1, theta, u, R2, r;
@@ -290,8 +290,8 @@ Real u_parallel(Real x, Real sqrt_temp, xso::rng& rng) {
 
             R2 = urand(rng);
 
-            if ((R1 <= p) && (R2 <= fast_exp(-u*u))) return u * sign;
-            if ((R1 > p) && (R2 <= fast_exp(u02 - u*u))) return u * sign;
+            if ((R1 <= p) && (R2 <= exp(-u*u))) return u * sign;
+            if ((R1 > p) && (R2 <= exp(u02 - u*u))) return u * sign;
         }
     }
 }
