@@ -1,3 +1,4 @@
 input/grid.h5
 output/test.py
 src/rhs.c
+src/split_source.c
