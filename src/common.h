@@ -222,5 +222,6 @@ void propogate(const Real target_tau, Photon& phot, Grid& g, int& ix, int& iy, i
                const Real dt, bool& hit_time_limit);
 void scatter(Photon& p, Grid& g, vector<Real>& mom_x, vector<Real>& mom_y, vector<Real>& mom_z,
              xso::rng& rng, const bool recoil, const bool isotropic);
+void monte_carlo(Photons& p, Grid& g, Real dt, int new_photon_count, bool recoil);
 
 #endif
