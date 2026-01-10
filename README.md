@@ -9,4 +9,4 @@ An input file for the code can be generated using the python script in the \inpu
 A CUDA port was created, but as of this moment it is not clear if the performance gains from porting to CUDA are necessary.
 Currently working on coupling the code to the PLUTO hydrodynamics code.
 
-(21/11): Current runtime ~ 1000 photons / 21 secs (16 processors) / 100^3 cell grid with n_hI = 5, T = 10^4 K (tau ~ 10^6)
+(10/01): The code is faster than RASCAS by around 5-10% when run serially on the same toy model. This matches the single-threaded CPU performance of THOR, a brand new RT code for the Lyman alpha line.
