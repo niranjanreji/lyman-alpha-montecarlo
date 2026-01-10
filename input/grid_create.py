@@ -94,6 +94,10 @@ with h5py.File(fname, "w") as f:
     g.create_dataset("y_edges", data=y_edges)
     g.create_dataset("z_edges", data=z_edges)
 
+    g.create_dataset("x_centers", data=x_centr)
+    g.create_dataset("y_centers", data=y_centr)
+    g.create_dataset("z_centers", data=z_centr)
+
     g.attrs["Lx"] = Lx
     g.attrs["Ly"] = Ly
     g.attrs["Lz"] = Lz

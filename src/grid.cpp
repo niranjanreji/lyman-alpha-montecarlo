@@ -73,6 +73,11 @@ Grid* load_grid(const string& path) {
     grid->y_edges = read_1d<Real>(f, "/grid/y_edges", RealType);
     grid->z_edges = read_1d<Real>(f, "/grid/z_edges", RealType);
 
+    // read cell centers
+    grid->x_centers = read_1d<Real>(f, "/grid/x_centers", RealType);
+    grid->y_centers = read_1d<Real>(f, "/grid/y_centers", RealType);
+    grid->z_centers = read_1d<Real>(f, "/grid/z_centers", RealType);
+
     // read physical fields
     grid->sqrt_temp = read_3d<uint16_t>(f, "/fields/sqrt_temp", grid->nx, grid->ny, grid->nz, PredType::NATIVE_UINT16);
     grid->hi = read_3d<Real>(f, "/fields/n_HI", grid->nx, grid->ny, grid->nz, RealType);

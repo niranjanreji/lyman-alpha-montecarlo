@@ -155,6 +155,9 @@ struct Grid {
     // cell edges
     vector<Real> x_edges, y_edges, z_edges;
 
+    // cell centers
+    vector<Real> x_centers, y_centers, z_centers;
+
     // physical fields
     vector<uint16_t> sqrt_temp;
     vector<Real> hi;
