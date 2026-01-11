@@ -7,6 +7,7 @@ extern "C" {
         const double* vr, 
         const double* r,
         const double* pr,
+        const double* vol,
         int n,
         double* out_force) 
     {
@@ -105,7 +106,8 @@ extern "C" {
                                   + grid->mom_y[idx] * rhat_y
                                   + grid->mom_z[idx] * rhat_z;
 
-                out_force[pluto_idx] += mom_radial;
+                // convert to a force per unit volume
+                out_force[pluto_idx] += mom_radial / (dt * vol[pluto_idx]);
             }
         }
 
