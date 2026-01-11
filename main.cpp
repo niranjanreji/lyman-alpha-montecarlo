@@ -9,6 +9,11 @@ int main () {
 
     Grid* grid = load_grid(fname);
     Photons* p = new Photons();
-    
-    monte_carlo(*p, *grid, 1e20, 100, true);
+
+    double total_time = 0;
+    while (total_time < 1e12) {
+        monte_carlo(*p, *grid, 1e9, 10, true);
+        total_time += 1e9;
+        cout << "Current time: " << total_time << " s" << endl;
+    }
 }

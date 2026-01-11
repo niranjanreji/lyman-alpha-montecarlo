@@ -3,6 +3,7 @@
 // ---------------------------------------
 
 #include "common.h"
+#include <chrono>
 
 // emits a set of photons
 void emit_photons(Photons& photons, Grid& grid, int num, Real dt) {
@@ -10,14 +11,15 @@ void emit_photons(Photons& photons, Grid& grid, int num, Real dt) {
     // total_luminosity is in photons/sec
     double weight = (grid.total_luminosity * dt) / num;
 
-    // base index for seeding new photon RNGs (use current photon count to ensure uniqueness)
-    size_t base_idx = photons.data.size();
+    // use system time for seeding (truncated to 32 bits for mixing)
+    auto now = std::chrono::high_resolution_clock::now();
+    uint32_t time_seed = static_cast<uint32_t>(now.time_since_epoch().count());
 
     for (int phot = 0; phot < num; ++phot) {
         Photon *p = new Photon();
 
-        // initialize per-photon RNG with unique seed based on photon index
-        p->rng.seed(static_cast<uint64_t>(base_idx + phot) * 2654435761u + 1);
+        // initialize per-photon RNG with unique seed combining time and photon index
+        p->rng.seed(static_cast<uint64_t>(time_seed) * 2654435761u + phot);
 
         p->time = 0;
         p->weight = weight;

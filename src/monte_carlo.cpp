@@ -139,11 +139,11 @@ void monte_carlo(Photons& p, Grid& g, Real dt, int new_photon_count, bool recoil
     cout << "Average scatters per photon: " << avg_scatters << endl;
     cout << "Total runtime: " << total_elapsed.count() << " s" << endl;
 
-    // write escaped photon frequencies to output file
+    // append escaped photon frequencies to output file
     if (!output_x_vals.empty()) {
-        ofstream fout("output/spectrum.txt");
+        ofstream fout("output/spectrum.txt", ios::app);
         for (Real xv : output_x_vals) fout << xv << "\n";
         fout.close();
-        cout << "Wrote spectrum.txt (" << output_x_vals.size() << " values)\n";
+        cout << "Appended to spectrum.txt (" << output_x_vals.size() << " values)\n";
     }
 }
