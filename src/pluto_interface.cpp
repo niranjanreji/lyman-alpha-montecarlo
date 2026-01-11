@@ -6,13 +6,16 @@ extern "C" {
         const double* rho,
         const double* vr, 
         const double* r,
+        const double* pr,
         int n,
-        double* out_force
-    ) 
+        double* out_force) 
     {
-        const string fname = "../input/grid.h5";
+        static double mu_h = 1.2;      // change based on information / system?
 
-        Grid* grid = load_grid(fname);
+        const string fname = "../input/grid.h5";
+        static Grid* grid = nullptr;
+
+        if (!grid) grid = load_grid(fname);
 
         // check if grid encompasses PLUTO's grid, if not, complain
 
@@ -22,10 +25,6 @@ extern "C" {
         Lz = grid->Lz;
 
         if (Lx*Lx + Ly*Ly + Lz*Lz < r[n-1]*r[n-1]) cerr << "PLUTO domain doesn't fit!" << endl;
-
-        // divide pluto rho array by mu_h * m_h to convert to number density
-
-        // also pass temperature from pluto call
 
         // modify the grid num density, velocity arrays to mirror PLUTO's rho, vr arrays
 
@@ -40,30 +39,32 @@ extern "C" {
 
             double rad = sqrt(x_center*x_center + y_center*y_center + z_center*z_center);
 
-            double rhat_x = x_center / rad;
-            double rhat_y = y_center / rad;
-            double rhat_z = z_center / rad;
-            
-            double temp = 1e40;
-            int pluto_idx = 0;
-            for (int j = 0; j < n; ++j) {
-                if (abs(rad - r[j]) < temp) {
-                    temp = abs(rad - r[j]);
-                    pluto_idx = j;
-                }
+            int pluto_idx = lower_bound(r, r + n, rad) - r;
+            pluto_idx = clamp(pluto_idx, 0, n-1);
+
+            grid->hi[idx] = (rho[pluto_idx]) / (mu_h * m_p);
+            grid->sqrt_temp[idx] = (uint16_t)lround(sqrt((pr[pluto_idx] * mu_h * m_p) / (rho[pluto_idx] * k)));
+
+            if (rad == 0.0) {
+                grid->vx[idx] = 0.0;
+                grid->vy[idx] = 0.0;
+                grid->vz[idx] = 0.0;
             }
+            else {
+                double rhat_x = x_center / rad;
+                double rhat_y = y_center / rad;
+                double rhat_z = z_center / rad;
 
-            grid->hi[idx] = rho[pluto_idx];
+                double v_radial = vr[pluto_idx];
 
-            double v_radial = vr[pluto_idx];
+                double vx = rhat_x * v_radial;
+                double vy = rhat_y * v_radial;
+                double vz = rhat_z * v_radial;
 
-            double vx = rhat_x * v_radial;
-            double vy = rhat_y * v_radial;
-            double vz = rhat_z * v_radial;
-
-            grid->vx[idx] = vx;
-            grid->vy[idx] = vy;
-            grid->vz[idx] = vz;
+                grid->vx[idx] = vx;
+                grid->vy[idx] = vy;
+                grid->vz[idx] = vz;
+            }
         }
 
         // inject new photons into p

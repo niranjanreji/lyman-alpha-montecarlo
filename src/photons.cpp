@@ -5,20 +5,26 @@
 #include "common.h"
 
 // emits a set of photons
-void emit_photons(Photons& photons, Grid& grid, xso::rng& rng, int num, Real dt) {
+void emit_photons(Photons& photons, Grid& grid, int num, Real dt) {
     // compute weight: (total photons emitted in dt) / num_packets
     // total_luminosity is in photons/sec
     double weight = (grid.total_luminosity * dt) / num;
 
+    // base index for seeding new photon RNGs (use current photon count to ensure uniqueness)
+    size_t base_idx = photons.data.size();
+
     for (int phot = 0; phot < num; ++phot) {
         Photon *p = new Photon();
+
+        // initialize per-photon RNG with unique seed based on photon index
+        p->rng.seed(static_cast<uint64_t>(base_idx + phot) * 2654435761u + 1);
 
         p->time = 0;
         p->weight = weight;
 
         // now pick source from sources
         int cells = grid.nx * grid.ny * grid.nz;
-        Real r = urand(rng);
+        Real r = urand(p->rng);
         
         // emit from grid (binary search CDF)
         if (r <= grid.lum_cdf[cells-1])
@@ -38,9 +44,9 @@ void emit_photons(Photons& photons, Grid& grid, xso::rng& rng, int num, Real dt)
             int ix = cell_idx / (grid.ny * grid.nz);
 
             // sample random position in cell
-            Real ux = urand(rng);
-            Real uy = urand(rng);
-            Real uz = urand(rng);
+            Real ux = urand(p->rng);
+            Real uy = urand(p->rng);
+            Real uz = urand(p->rng);
 
             p->pos_x    = grid.x_edges[ix] + ux*grid.dx;
             p->pos_y    = grid.y_edges[iy] + uy*grid.dy;
@@ -51,8 +57,8 @@ void emit_photons(Photons& photons, Grid& grid, xso::rng& rng, int num, Real dt)
             // following RASCAS, emit frequencies from a gaussian
             // with std dev = (nu_alpha / c) * sqrt(2kT / m_p)
             // in x units, std dev = 1, center = 0
-            Real r1 = urand(rng);
-            Real r2 = urand(rng);
+            Real r1 = urand(p->rng);
+            Real r2 = urand(p->rng);
 
             p->x = sqrt_2 * sqrt(-fast_log(r1)) * cos(two_pi * r2);
         }
@@ -85,8 +91,8 @@ void emit_photons(Photons& photons, Grid& grid, xso::rng& rng, int num, Real dt)
         }
 
         // pick direction uniformly
-        Real u1 = urand(rng);
-        Real u2 = urand(rng);
+        Real u1 = urand(p->rng);
+        Real u2 = urand(p->rng);
 
         Real cosine = 2.0*u1 - 1.0;
         Real phi    = two_pi*u2;

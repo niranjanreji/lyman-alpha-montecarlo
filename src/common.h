@@ -190,7 +190,9 @@ struct Photon {
     double weight;
     int cell_idx;
     uint8_t escaped;
-    uint64_t rng_state;
+
+    // Per-photon RNG for reproducible random sequences across monte_carlo calls
+    xso::rng rng;
 };
 
 
@@ -217,10 +219,10 @@ Grid* load_grid(const string& path);
 Photons* initialize_soa(int MAX_N = 100000);
 int allocate_spot(Photons& p);
 void deallocate_spot(Photons& p, int i);
-void emit_photons(Photons& p, Grid& grid, xso::rng& rng, int num, Real dt);
+void emit_photons(Photons& p, Grid& grid, int num, Real dt);
 
 // physics (physics.cpp)
-inline bool escaped(Grid& g, Photon& p, int ix, int iy, int iz);
+bool escaped(Grid& g, Photon& p, int ix, int iy, int iz);
 void propogate(const Real target_tau, Photon& phot, Grid& g, int& ix, int& iy, int& iz,
                const Real dt, bool& hit_time_limit);
 void scatter(Photon& p, Grid& g, vector<Real>& mom_x, vector<Real>& mom_y, vector<Real>& mom_z,

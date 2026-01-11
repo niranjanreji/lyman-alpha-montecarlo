@@ -4,7 +4,7 @@
 
 #include "common.h"
 
-inline bool escaped(Grid& g, Photon& p, int ix, int iy, int iz) {
+bool escaped(Grid& g, Photon& p, int ix, int iy, int iz) {
     if (ix < 0 || ix >= g.nx ||
         iy < 0 || iy >= g.ny ||
         iz < 0 || iz >= g.nz) {

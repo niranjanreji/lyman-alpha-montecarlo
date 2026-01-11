@@ -27,9 +27,6 @@ void monte_carlo(Photons& p, Grid& g, Real dt, int new_photon_count, bool recoil
     int completed_photons = 0;
     long long total_scatters = 0;
 
-    const unsigned base_seed = 0;
-    xso::rng rng_main(base_seed);
-
     // reset time for all carried-over photons
     #pragma omp parallel for
     for (size_t i = 0; i < p.data.size(); ++i) {
@@ -37,7 +34,7 @@ void monte_carlo(Photons& p, Grid& g, Real dt, int new_photon_count, bool recoil
     }
 
     // emit new photons (single-threaded since allocation modifies shared state)
-    emit_photons(p, g, rng_main, new_photon_count, dt);
+    emit_photons(p, g, new_photon_count, dt);
 
     // capture size after emission
     size_t n_active = p.data.size();
@@ -49,7 +46,6 @@ void monte_carlo(Photons& p, Grid& g, Real dt, int new_photon_count, bool recoil
     #pragma omp parallel
     {
         int tid = omp_get_thread_num();
-        xso::rng rng_local(base_seed + (unsigned)tid * 9973u);
 
         #pragma omp for schedule(dynamic)
         for (size_t photon_idx = 0; photon_idx < n_active; ++photon_idx)
@@ -65,9 +61,10 @@ void monte_carlo(Photons& p, Grid& g, Real dt, int new_photon_count, bool recoil
             int n_scatters = 0;
 
             // evolve until escaped or time limit reached
+            // use the photon's own RNG for reproducibility across monte_carlo calls
             while (!escaped(g, phot, ix, iy, iz) && !hit_time_limit)
             {
-                r   = urand(rng_local);
+                r   = urand(phot.rng);
                 tau = -fast_log(r);
 
                 // propogate photon through tau (may hit time limit)
@@ -78,7 +75,7 @@ void monte_carlo(Photons& p, Grid& g, Real dt, int new_photon_count, bool recoil
 
                 // if no escape and still have time, scatter
                 scatter(phot, g, mom_x_thread[tid], mom_y_thread[tid], mom_z_thread[tid],
-                        rng_local, recoil, false);
+                        phot.rng, recoil, false);
                 n_scatters++;
             }
 
