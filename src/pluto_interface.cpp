@@ -72,5 +72,46 @@ extern "C" {
         static Photons* p = new Photons();
         
         monte_carlo(*p, *grid, dt, 100, true);
+
+        // map 3D cartesian momentum back to PLUTO's 1D radial bins
+        // first, zero out the output force array
+        for (int i = 0; i < n; ++i) {
+            out_force[i] = 0.0;
+        }
+
+        // accumulate momentum from each 3D cell into the corresponding radial bin
+        for (int idx = 0; idx < grid->nx * grid->ny * grid->nz; ++idx) {
+            int iz = idx % grid->nz;
+            int iy = (idx / grid->nz) % grid->ny;
+            int ix = idx / (grid->ny * grid->nz);
+
+            double x_center = grid->x_centers[ix];
+            double y_center = grid->y_centers[iy];
+            double z_center = grid->z_centers[iz];
+
+            double rad = sqrt(x_center*x_center + y_center*y_center + z_center*z_center);
+
+            // find corresponding PLUTO radial bin
+            int pluto_idx = lower_bound(r, r + n, rad) - r;
+            pluto_idx = clamp(pluto_idx, 0, n - 1);
+
+            // project cartesian momentum onto radial direction
+            if (rad > 0.0) {
+                double rhat_x = x_center / rad;
+                double rhat_y = y_center / rad;
+                double rhat_z = z_center / rad;
+
+                double mom_radial = grid->mom_x[idx] * rhat_x
+                                  + grid->mom_y[idx] * rhat_y
+                                  + grid->mom_z[idx] * rhat_z;
+
+                out_force[pluto_idx] += mom_radial;
+            }
+        }
+
+        // clear the grid momentum for the next timestep
+        fill(grid->mom_x.begin(), grid->mom_x.end(), 0.0);
+        fill(grid->mom_y.begin(), grid->mom_y.end(), 0.0);
+        fill(grid->mom_z.begin(), grid->mom_z.end(), 0.0);
     }
 }
