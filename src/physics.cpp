@@ -234,7 +234,7 @@ Real u_parallel(Real x, Real sqrt_temp, xso::rng& rng) {
     Real xabs = fabs(x);
 
     // x > 8 regime: gaussian approximation using box-muller
-    if (x >= 8.0) {
+    if (xabs >= 8.0) {
         Real u1 = urand(rng);
         Real u2 = urand(rng);
         if (u1 < 1e-16) u1 = 1e-16;

@@ -34,7 +34,7 @@ void monte_carlo(Photons& p, Grid& g, Real dt, int new_photon_count, bool recoil
     }
 
     // emit new photons (single-threaded since allocation modifies shared state)
-    if (p.data.size() == 0) emit_photons(p, g, new_photon_count, dt);
+    emit_photons(p, g, new_photon_count, dt);
 
     // capture size after emission
     size_t n_active = p.data.size();

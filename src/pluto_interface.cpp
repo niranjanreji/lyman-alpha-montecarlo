@@ -30,7 +30,7 @@ extern "C" {
 
         // modify the grid num density, velocity arrays to mirror PLUTO's rho, vr arrays
 
-        for (int idx = 0; idx < grid->nx*grid->ny*grid->nz - 1; ++idx) {
+        for (int idx = 0; idx < grid->nx*grid->ny*grid->nz; ++idx) {
             int iz = idx % grid->nz;
             int iy = (idx / grid->nz) % grid->ny;
             int ix = idx / (grid->ny * grid->nz);
