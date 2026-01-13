@@ -20,7 +20,7 @@ void RadiativeTransfer(
 #endif
 
 /* Global radiative transfer force array - set by SplitSource, used by RightHandSide */
-extern double *g_radForce;
-extern int     g_radForceSize;
+extern double *la_radForce;
+extern int     la_radForceSize;
 
 #endif

@@ -25,7 +25,8 @@ extern "C" {
         Ly = grid->Ly;
         Lz = grid->Lz;
 
-        if (Lx*Lx + Ly*Ly + Lz*Lz < r[n-1]*r[n-1]) cerr << "PLUTO domain doesn't fit!" << endl;
+        double Rmax = sqrt(Lx*Lx + Ly*Ly + Lz*Lz) * 0.5;
+        if (Rmax < r[n-1]) cerr << "PLUTO domain doesn't fit!" << endl;
 
         // modify the grid num density, velocity arrays to mirror PLUTO's rho, vr arrays
 

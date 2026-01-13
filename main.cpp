@@ -11,9 +11,13 @@ int main () {
     Photons* p = new Photons();
 
     double total_time = 0;
-    while (total_time < 1e12) {
-        monte_carlo(*p, *grid, 1e9, 10, true);
-        total_time += 1e9;
+    while (p->data.size() > 0 || total_time == 0) {
+        monte_carlo(*p, *grid, 1e8, 1e5, true);
+        total_time += 1e8;
         cout << "Current time: " << total_time << " s" << endl;
+        cout << "Press enter to continue...";
+        cin.get();
     }
+
+    return 0;
 }
