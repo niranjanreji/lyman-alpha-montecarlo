@@ -105,5 +105,6 @@ void emit_photons(Photons& photons, Grid& grid, int num, Real dt) {
         p->dir_z = cosine;
 
         photons.add_photon(*p);
+        delete p;
     }
 }

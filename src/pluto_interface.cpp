@@ -13,7 +13,7 @@ extern "C" {
     {
         static double mu_h = 1.2;      // change based on information / system?
 
-        const string fname = "../input/grid.h5";
+        const string fname = "./input/grid.h5";
         static Grid* grid = nullptr;
 
         if (!grid) grid = load_grid(fname);
@@ -26,7 +26,7 @@ extern "C" {
         Lz = grid->Lz;
 
         double Rmax = sqrt(Lx*Lx + Ly*Ly + Lz*Lz) * 0.5;
-        if (Rmax < r[n-1]) cerr << "PLUTO domain doesn't fit!" << endl;
+        if (Rmax < r[n-1]) throw std::domain_error("PLUTO domain doesn't fit! Ensure your RT grid is larger than the PLUTO domain.");
 
         // modify the grid num density, velocity arrays to mirror PLUTO's rho, vr arrays
 
@@ -45,7 +45,9 @@ extern "C" {
             pluto_idx = clamp(pluto_idx, 0, n-1);
 
             grid->hi[idx] = (rho[pluto_idx]) / (mu_h * m_p);
+            if (grid->hi[idx] < 0) throw std::domain_error("PLUTO is returning negative densities. Verify problem setup.");
             grid->sqrt_temp[idx] = (uint16_t)lround(sqrt((pr[pluto_idx] * mu_h * m_p) / (rho[pluto_idx] * k)));
+            if (grid->sqrt_temp[idx] < 0) throw std::domain_error("PLUTO is returning negative temperatures. Verify problem setup.");
 
             if (rad == 0.0) {
                 grid->vx[idx] = 0.0;
