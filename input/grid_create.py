@@ -1,10 +1,10 @@
 # ------------------------------------------------------------------
-# usage: python create_grid.py grid.h5
+# usage: python grid_create.py grid.h5 [number_density]
 # creates static file with geometry and
 # initial physical fields
 # ------------------------------------------------------------------
 
-import sys
+import argparse
 import h5py
 import datetime
 import numpy as np
@@ -26,7 +26,14 @@ def excitation_rate_coeff(T):
     return (2.41e-6/T**0.5) * (T/1e4)**0.22 * np.exp(-(10.2)/(8.617333262e-5 * T))
 
 
-fname = sys.argv[1]
+parser = argparse.ArgumentParser(description="Create input grid for Ly-alpha RT")
+parser.add_argument("filename", help="Output HDF5 filename")
+parser.add_argument("--density", "-n", type=float, default=5.0,
+                    help="Number density for cells within 3e18 cm of center (default: 5.0)")
+args = parser.parse_args()
+
+fname = args.filename
+number_density = args.density
 
 # grid resolution and domain (cm)
 nx, ny, nz = 100, 100, 100
@@ -49,6 +56,7 @@ print(f"                     dy = {dy:.2e} cm")
 print(f"                     dz = {dz:.2e} cm")
 print(f"  Domain size      : {Lx:.2e} * {Ly:.2e} * {Lz:.2e} cm^3")
 print(f"  Cell volume      : {dx*dy*dz:.2e} cm^3")
+print(f"  Number density   : {number_density:.2e} (within r < 3e18 cm)")
 print("-" * 70)
 
 # create neutral hydrogen field
@@ -57,7 +65,7 @@ for i in range(nx):
     for j in range(ny):
         for k in range(nz):
             r = np.sqrt(x_centr[i]**2 + y_centr[j]**2 + z_centr[k]**2)
-            hi[i, j, k] = 5.0 if r < 3e18 else 0.0
+            hi[i, j, k] = number_density if r < 3e18 else 0.0
 
 # create ionization state grids
 ne  = np.zeros((nx, ny, nz))

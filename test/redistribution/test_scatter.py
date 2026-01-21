@@ -29,11 +29,11 @@ def analytic_redistribution(xo_arr, xi, sigma):
     area = np.trapezoid(R, xo_arr)
     return R / area
 
-print("Compiling test_scatter.cpp ...")
-subprocess.run(["g++", "-std=c++20", "-O3", "test_scatter.cpp", "-o", "test_scatter", "-lhdf5_serial_cpp", "-lhdf5_serial"], check=True)
+#print("Compiling test_scatter.cpp ...")
+#subprocess.run(["g++", "-std=c++20", "-O3", "test_scatter.cpp", "-o", "test_scatter", "-lhdf5_serial_cpp", "-lhdf5_serial"], check=True)
 
-print("Running test_scatter ...")
-subprocess.run(["./test_scatter"], check=True)
+#print("Running test_scatter ...")
+#subprocess.run(["./test_scatter"], check=True)
 
 T = 100
 a = 4.7e-4 / np.sqrt(T / 1e4)
