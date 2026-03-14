@@ -108,7 +108,7 @@ ax.legend(
     loc='upper right', fontsize=10, framealpha=0.9
 )
 
-ax.set_xlim(-50, 50)
+ax.set_xlim(-30, 30)
 ax.tick_params(axis='both', labelsize=10)
 
 plt.tight_layout()

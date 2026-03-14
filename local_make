@@ -1,12 +1,12 @@
 # Monte Carlo Lyman-alpha RT integration
 
-CXX = g++
-CXXFLAGS = -std=c++20 -O3 -fopenmp -c
-LDFLAGS += -lhdf5_serial_cpp -lhdf5_serial -fopenmp -lstdc++
-INCLUDE_DIRS += -I./src
+CXX = mpicxx
+CXXFLAGS = -std=c++20 -O3 -fopenmp -DPARALLEL -c
+LDFLAGS += -fopenmp -lstdc++
+INCLUDE_DIRS += -I./src -I.
 VPATH += :./src
 
-OBJ += pluto_interface.o mc_grid.o photons.o monte_carlo.o physics.o
+OBJ += pluto_interface.o mc_grid.o photons.o monte_carlo.o physics.o voigt.o user_setup.o
 
 .cpp.o:
 	$(CXX) $(CXXFLAGS) $(INCLUDE_DIRS) $<

@@ -1,5 +1,8 @@
 input/grid.h5
 output/test.py
-src/rhs.c
-src/split_source.c
-test/redistribution/*.dat
+spit_source.c
+init.c
+main.c
+definitions.h
+test/hummer_redistribution/output/*.dat
+test/*/*.o

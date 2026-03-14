@@ -29,19 +29,13 @@ def analytic_redistribution(xo_arr, xi, sigma):
     area = np.trapezoid(R, xo_arr)
     return R / area
 
-#print("Compiling test_scatter.cpp ...")
-#subprocess.run(["g++", "-std=c++20", "-O3", "test_scatter.cpp", "-o", "test_scatter", "-lhdf5_serial_cpp", "-lhdf5_serial"], check=True)
-
-#print("Running test_scatter ...")
-#subprocess.run(["./test_scatter"], check=True)
-
 T = 100
 a = 4.7e-4 / np.sqrt(T / 1e4)
 
 xins = [0, 1, 2, 3, 4, 5, 8]
 bins = np.linspace(-5, 13, 801)
 
-plt.figure(figsize=(20,10))
+fig, ax = plt.subplots(figsize=(10, 10), dpi=200)
 
 for i, xin in enumerate(xins):
     fname = f"out_xin_{xin}.dat"
@@ -52,13 +46,15 @@ for i, xin in enumerate(xins):
 
     R_analytic = analytic_redistribution(bc, xin, a)
     analytic_label = "Analytic" if i == 0 else None
-    plt.plot(bc, R_analytic, linestyle='--', color='black', label=analytic_label)
-    plt.plot(bc, hist, label=f"x_in = {xin}")
+    ax.plot(bc, R_analytic, linestyle='--', color='black', linewidth=4.0, label=analytic_label)
+    ax.plot(bc, hist, linewidth=1.8, alpha=0.95, label=f"x_in = {xin}")
 
-plt.xlabel("x_out")
-plt.ylabel("PDF")
-plt.xlim(-5, 13)
-plt.legend()
-plt.title("Single-Scatter Redistribution Function Test")
-plt.tight_layout()
+ax.set_xlabel("x_out", fontsize=14)
+ax.set_ylabel("PDF", fontsize=14)
+ax.set_xlim(-5, 13)
+ax.tick_params(axis='both', labelsize=12)
+ax.legend(fontsize=12)
+ax.set_title("Single-Scatter Redistribution Function Test — T = 100 K (RII-A, Hummer 1962)", fontsize=14)
+fig.tight_layout()
+fig.savefig("redistribution.png", dpi=200, bbox_inches='tight')
 plt.show()

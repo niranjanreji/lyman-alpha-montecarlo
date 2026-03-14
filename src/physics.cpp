@@ -1,144 +1,166 @@
-// ---------------------------------------
-// physics.cpp - raytracing, scattering
-// ---------------------------------------
+/* physics.cpp — photon propagation, resonant scattering, and
+ * boundary condition checks. implements the core physics of
+ * lyman-alpha radiative transfer including voigt cross sections,
+ * frequency redistribution, and momentum/energy deposition.
+ *
+ * Niranjan Reji, Raman Research Institute, March 2026
+ * assisted by Claude (Anthropic) */
 
 #include "common.h"
+#include <rt_definitions.h>
 
-bool escaped(Grid& g, Photon& p, int ix, int iy, int iz) {
-    if (ix < 0 || ix >= g.nx ||
-        iy < 0 || iy >= g.ny ||
-        iz < 0 || iz >= g.nz) {
-        p.escaped = 1;
-        return true;
-    }
-    return false;
+/**
+ * @brief check whether a photon has escaped the simulation domain.
+ *
+ * for SLAB geometry, applies periodic boundary conditions in x/y
+ * and checks for escape in z. for FULL_BOX, checks all boundaries.
+ *
+ * @param g   grid reference
+ * @param p   photon to check (position may be wrapped for SLAB)
+ * @param ix  cell index in x (updated if wrapped)
+ * @param iy  cell index in y (updated if wrapped)
+ * @param iz  cell index in z
+ * @return true if photon has escaped
+ */
+bool escaped(Grid& g, Photon& p, int& ix, int& iy, int& iz) {
+    #if RTGEOMETRY == SLAB
+        if (p.pos_x < -LX/2.0) {
+            p.pos_x += LX;
+        }
+        else if (p.pos_x > LX/2.0) {
+            p.pos_x -= LX;
+        }
+        if (p.pos_y < -LY/2.0) {
+            p.pos_y += LY;
+        }
+        else if (p.pos_y > LY/2.0) {
+            p.pos_y -= LY;
+        }
+
+        ix = (int)((p.pos_x + LX/2.0) / g.dx);
+        iy = (int)((p.pos_y + LY/2.0) / g.dy);
+        p.cell_idx = NY * NZ * ix + NZ * iy + iz;
+
+        if (fabs(p.pos_z) > LZ/2.0) {
+            p.escaped = 1;
+            return true;
+        }
+        return false;
+    #else
+            if (ix < 0 || ix >= NX ||
+            iy < 0 || iy >= NY ||
+            iz < 0 || iz >= NZ) {
+            p.escaped = 1;
+            return true;
+        }
+        return false;
+    #endif
 }
 
-// voigt(x, t): takes sqrt_temp, doppler freq x
-// returns H(x, T) using approx from COLT (2015)
-inline Real voigt(Real x, Real sqrt_temp) {
-    const Real a = a_const / sqrt_temp;
-    const Real z = x * x;
-
-    // far-wing asymptotic expansion
-    if (z >= Real(25)) {
-        Real H = z - Real(5.5);
-        H = z - Real(3.5) - Real(5) / H;
-        H = z - Real(1.5) - Real(1.5) / H;
-        return (a / sqrt_pi) / H;
-    }
-
-    const Real ez = exp(-z);
-
-    // intermediate regime
-    if (z > Real(3)) {
-        Real H = z - B8;
-        H = z - B6 + B7 / H;
-        H = z + B4 + B5 / H;
-        H = z - B2 + B3 / H;
-        H = B0 + B1 / H;
-        return ez + a * H;
-    }
-
-    // core region
-    {
-        Real H = z - A6;
-        H = z - A4 + A5 / H;
-        H = z - A2 + A3 / H;
-        H = A0 + A1 / H;
-        return ez * (Real(1) - a * H);
-    }
-}
-
-// small helper struct for next function
+/* helper struct for compute_next_boundary */
 struct Boundary {
-    Real t;
+    double t;             /* step size */
     int axis, sign;
 };
 
-// compute_next_boundary() : identify distance to cell boundary and return
-// identify which axis will be crossed at boundary as well
-inline Boundary compute_next_boundary(Photon& phot, const Grid& g, 
+/**
+ * @brief compute the distance to the next cell boundary along the photon's direction.
+ * @param phot  photon with position and direction
+ * @param g     grid with cell edges
+ * @param ix    current cell index in x
+ * @param iy    current cell index in y
+ * @param iz    current cell index in z
+ * @return Boundary struct with distance, axis crossed, and direction sign
+ */
+inline Boundary compute_next_boundary(Photon& phot, const Grid& g,
                                       const int ix, const int iy, const int iz) {
-    constexpr Real eps = (Real)1e-10;
+    constexpr double eps = (double)1e-10;
 
-    const Real px = phot.pos_x;
-    const Real py = phot.pos_y;
-    const Real pz = phot.pos_z;
+    const double px = phot.pos_x;
+    const double py = phot.pos_y;
+    const double pz = phot.pos_z;
 
-    const Real dx = phot.dir_x;
-    const Real dy = phot.dir_y;
-    const Real dz = phot.dir_z;
+    const double dx = phot.dir_x;
+    const double dy = phot.dir_y;
+    const double dz = phot.dir_z;
 
-    // figure out direction signs (ends up +1 or -1)
+    /* figure out direction signs (ends up +1 or -1) */
     const int sx = (dx > 0) - (dx < 0);
     const int sy = (dy > 0) - (dy < 0);
     const int sz = (dz > 0) - (dz < 0);
 
-    // index of voxel faces that photon points to
+    /* index of voxel faces that photon points to */
     const int ix_face = ix + (sx > 0);
     const int iy_face = iy + (sy > 0);
     const int iz_face = iz + (sz > 0);
 
-    // distances to next axis boundary along each respective axis
-    const Real tx = (fabs(dx) > eps) ? (g.x_edges[ix_face] - px) / dx : INF;
-    const Real ty = (fabs(dy) > eps) ? (g.y_edges[iy_face] - py) / dy : INF;
-    const Real tz = (fabs(dz) > eps) ? (g.z_edges[iz_face] - pz) / dz : INF;
+    /* distances to next axis boundary along each respective axis */
+    const double tx = (fabs(dx) > eps) ? (g.x_edges[ix_face] - px) / dx : INF;
+    const double ty = (fabs(dy) > eps) ? (g.y_edges[iy_face] - py) / dy : INF;
+    const double tz = (fabs(dz) > eps) ? (g.z_edges[iz_face] - pz) / dz : INF;
 
-    // find minimum
+    /* find minimum */
     Boundary b{tx, 0, sx};
     if (ty < b.t) b = {ty, 1, sy};
     if (tz < b.t) b = {tz, 2, sz};
     return b;
 }
 
-// propogate(): takes optical depth, raytraces photon to next event
-// sets next photon position before scatter
-// dt = time budget for this monte carlo step, hit_time_limit set if photon runs out of time
-void propogate(const Real target_tau, Photon& phot, Grid& g, int& ix, int& iy, int& iz,
-               const Real dt, bool& hit_time_limit) {
-    const Real eps = g.dx*1e-14;
-    Real tau = 0.0;
+/**
+ * @brief propagate a photon through the grid until it accumulates target_tau
+ *        optical depth, escapes, or runs out of time.
+ * @param target_tau     optical depth to accumulate before stopping
+ * @param phot           photon to propagate (position/cell updated in place)
+ * @param g              grid with physical fields
+ * @param ix             cell index in x (updated in place)
+ * @param iy             cell index in y (updated in place)
+ * @param iz             cell index in z (updated in place)
+ * @param dt             time budget for this monte carlo step [s]
+ * @param hit_time_limit set to true if photon runs out of time
+ */
+void propogate(const double target_tau, Photon& phot, Grid& g, int& ix, int& iy, int& iz,
+               const double dt, bool& hit_time_limit) {
 
-    // define variables outside while loop
-    Real sqrt_temp, n_hi, vx, vy, vz, t, dir_dot_v, x_local, sigma_alpha, dtau, s, inv_sqrt_temp;
-    Real delta_t, distance;
+    const double eps = g.dx*1e-14;
+    double tau = 0.0;
+
+    double sqrt_temp, n_HI, ux, uy, uz, t, dir_dot_v, x_local, sigma_alpha, dtau, s, inv_sqrt_temp;
+    double delta_t, distance, remaining_time, remaining_distance;
+    double a;
     Boundary b;
 
     int cell_idx = phot.cell_idx;
 
-    // main raytracing loop
     while (tau < target_tau) {
         if (escaped(g, phot, ix, iy, iz)) return;
+        cell_idx = phot.cell_idx;
 
-        // get local cell properties
-        vx   = g.vx[cell_idx];
-        vy   = g.vy[cell_idx];
-        vz   = g.vz[cell_idx];
-        n_hi = g.hi[cell_idx];
+        /* get local cell properties */
+        ux   = g.ux[cell_idx];
+        uy   = g.uy[cell_idx];
+        uz   = g.uz[cell_idx];
+        n_HI = g.nHI[cell_idx];
         sqrt_temp = g.sqrt_temp[cell_idx];
-        inv_sqrt_temp = Real(1.0) / sqrt_temp;
+        inv_sqrt_temp = 1.0 / sqrt_temp;
 
-        // distance to next cell + dir
+        /* distance to next cell boundary */
         b = compute_next_boundary(phot, g, ix, iy, iz);
         t = b.t;
 
-        // set to min step size
         if (t < eps) t = eps;
 
-        if (n_hi < 1e-30) {
+        if (n_HI < 1e-40) {
             distance = t + eps;
-            delta_t = distance * inv_c;
+            delta_t = distance * inv_c;   /* propagation time */
 
-            // check time limit before moving
+            /* check propagation time */
             if (phot.time + delta_t > dt) {
-                // move partially to use up remaining time
-                Real remaining_time = dt - phot.time;
-                Real d_partial = remaining_time * c;
+                remaining_time = dt - phot.time;
+                remaining_distance = remaining_time * c;
 
-                phot.pos_x += d_partial * phot.dir_x;
-                phot.pos_y += d_partial * phot.dir_y;
-                phot.pos_z += d_partial * phot.dir_z;
+                phot.pos_x += remaining_distance * phot.dir_x;
+                phot.pos_y += remaining_distance * phot.dir_y;
+                phot.pos_z += remaining_distance * phot.dir_z;
 
                 phot.time = dt; hit_time_limit = true;
                 return;
@@ -149,45 +171,68 @@ void propogate(const Real target_tau, Photon& phot, Grid& g, int& ix, int& iy, i
             phot.pos_z += distance * phot.dir_z;
             phot.time += delta_t;
 
-            if (b.axis == 0) ix += b.sign;
-            else if (b.axis == 1) iy += b.sign;
-            else iz += b.sign;
-            cell_idx = g.ny * g.nz * ix + g.nz * iy + iz;
+            if (b.axis == 0) {
+                ix += b.sign;
+                cell_idx += b.sign * (NY * NZ);
+            }
+            else if (b.axis == 1) {
+                iy += b.sign;
+                cell_idx += b.sign * NZ;
+            }
+            else {
+                iz += b.sign;
+                cell_idx += b.sign;
+            }
             phot.cell_idx = cell_idx;
             continue;
         }
 
-        // get change in x due to local temp
+        /* compute change in x due to local temp */
         phot.x *= (phot.local_sqrt_temp * inv_sqrt_temp);
         phot.local_sqrt_temp = sqrt_temp;
 
-        // find local x due to bulk v
-        dir_dot_v = vx*phot.dir_x + vy*phot.dir_y + vz*phot.dir_z;
-        x_local   = phot.x - (dir_dot_v * inv_sqrt_temp) / (vth_const);
-        sigma_alpha = 5.898e-12 * inv_sqrt_temp * voigt(x_local, sqrt_temp);
+        /* find local x due to bulk v (ux/uy/uz already dimensionless) */
+        dir_dot_v = ux*phot.dir_x + uy*phot.dir_y + uz*phot.dir_z;
+        x_local   = phot.x - dir_dot_v;
+        sigma_alpha = 5.898e-12 * inv_sqrt_temp;
 
-        // take a step in optical depth
-        dtau = n_hi * sigma_alpha * (t + eps);
+        a = a_const * inv_sqrt_temp;
 
-        // is target optical depth in current cell?
+        #if VOIGT_FUNCTION == SMITH2015
+            if (a >= 0.05) {
+                sigma_alpha *= voigt_humlicek(x_local, a);  /* outside smith range */
+            }
+            else {
+                sigma_alpha *= voigt_smith(x_local, a);
+            }
+        #elif VOIGT_FUNCTION == HUMLICEK1982
+            sigma_alpha *= voigt_humlicek(x_local, a);
+        #elif VOIGT_FUNCTION == TASITSIOMI2006
+            sigma_alpha *= voigt_tasitsiomi(x_local, a);
+        #else
+            #error "Set VOIGT_FUNCTION in rt_definitions.h correctly"
+        #endif
+
+        /* compute optical depth step */
+        dtau = n_HI * sigma_alpha * (t + eps);
+
+        /* is target tau within current depth (< dtau) */
         if (tau + dtau > target_tau) {
-            s = (target_tau - tau) / (n_hi * sigma_alpha);
+            s = (target_tau - tau) / (n_HI * sigma_alpha);
             delta_t = s * inv_c;
 
-            // check time limit before moving to scatter location
             if (phot.time + delta_t > dt) {
-                // move partially to use up remaining time
-                Real remaining_time = dt - phot.time;
-                Real d_partial = remaining_time * c;
-                phot.pos_x += d_partial * phot.dir_x;
-                phot.pos_y += d_partial * phot.dir_y;
-                phot.pos_z += d_partial * phot.dir_z;
+                remaining_time = dt - phot.time;
+                remaining_distance = remaining_time * c;
+
+                phot.pos_x += remaining_distance * phot.dir_x;
+                phot.pos_y += remaining_distance * phot.dir_y;
+                phot.pos_z += remaining_distance * phot.dir_z;
 
                 phot.time = dt; hit_time_limit = true;
                 return;
             }
 
-            // update pos
             phot.pos_x += s * phot.dir_x;
             phot.pos_y += s * phot.dir_y;
             phot.pos_z += s * phot.dir_z;
@@ -195,20 +240,19 @@ void propogate(const Real target_tau, Photon& phot, Grid& g, int& ix, int& iy, i
             return;
         }
 
-        // move to next cell
+        /* move to next cell */
         tau += dtau;
         distance = t + eps;
         delta_t = distance * inv_c;
 
-        // check time limit before moving to next cell
+        /* check time limit before moving to next cell */
         if (phot.time + delta_t > dt) {
-            // move partially to use up remaining time
-            Real remaining_time = dt - phot.time;
-            Real d_partial = remaining_time * c;
+            remaining_time = dt - phot.time;
+            remaining_distance = remaining_time * c;
 
-            phot.pos_x += d_partial * phot.dir_x;
-            phot.pos_y += d_partial * phot.dir_y;
-            phot.pos_z += d_partial * phot.dir_z;
+            phot.pos_x += remaining_distance * phot.dir_x;
+            phot.pos_y += remaining_distance * phot.dir_y;
+            phot.pos_z += remaining_distance * phot.dir_z;
 
             phot.time = dt; hit_time_limit = true;
             return;
@@ -219,74 +263,90 @@ void propogate(const Real target_tau, Photon& phot, Grid& g, int& ix, int& iy, i
         phot.pos_z += distance * phot.dir_z;
         phot.time += delta_t;
 
-        if (b.axis == 0) ix += b.sign;
-        else if (b.axis == 1) iy += b.sign;
-        else iz += b.sign;
-        cell_idx = g.ny * g.nz * ix + g.nz * iy + iz;
+        if (b.axis == 0) {
+            ix += b.sign;
+            cell_idx += b.sign * (NY * NZ);
+        }
+        else if (b.axis == 1) {
+            iy += b.sign;
+            cell_idx += b.sign * NZ;
+        }
+        else {
+            iz += b.sign;
+            cell_idx += b.sign;
+        }
         phot.cell_idx = cell_idx;
     }
 }
 
-// u_parallel(): samples parallel atom velocity component
-// uses rejection method following RASCAS
-Real u_parallel(Real x, Real sqrt_temp, xso::rng& rng) {
-    Real sign = (x >= 0.0) ? 1 : -1;
-    Real xabs = fabs(x);
+/**
+ * @brief sample the parallel component of the scattering atom's velocity.
+ *
+ * uses the rejection method following RASCAS for |x| < 8, and a
+ * gaussian approximation via box-muller for |x| >= 8.
+ *
+ * @param x          dimensionless frequency in the bulk frame
+ * @param sqrt_temp  sqrt of local temperature [K^0.5]
+ * @param rng        per-photon random number generator
+ * @return parallel atom velocity component in thermal units
+ */
+double u_parallel(double x, double sqrt_temp, xso::rng& rng) {
+    double sign = (x >= 0.0) ? 1 : -1;
+    double xabs = fabs(x);
 
-    // x > 8 regime: gaussian approximation using box-muller
+    /* x > 8 regime: gaussian approximation using box-muller */
     if (xabs >= 8.0) {
-        Real u1 = urand(rng);
-        Real u2 = urand(rng);
+        double u1 = urand(rng);
+        double u2 = urand(rng);
         if (u1 < 1e-16) u1 = 1e-16;
 
-        Real z = sqrt(-fast_log(u1)) * cos(two_pi * u2);
+        double z = sqrt(-log(u1)) * cos(two_pi * u2);
         return sign * ((1.0 / xabs) + z);
     }
-    // rejection method otherwise
+    /* rejection method otherwise */
     {
-        Real a    = a_const / sqrt_temp;
-        Real zeta = fast_log(a) * inv_ln_10;
+        double a    = a_const / sqrt_temp;
+        double zeta = log(a) * inv_ln_10;
 
-        Real u0 = 0;
+        double u0 = 0;
         if (xabs >= 0.6) {
-            const Real x  = xabs;
-            const Real x2 = x * x;
-            const Real x4 = x2 * x2;
-            const Real z2 = zeta * zeta;
+            const double x  = xabs;
+            const double x2 = x * x;
+            const double x4 = x2 * x2;
+            const double z2 = zeta * zeta;
 
-            // rewritten using estrin's scheme to help parallelize
-            const Real p0 =
+            /* rewritten using estrin's scheme to help parallelize */
+            const double p0 =
                 (2.648963 + 2.014446*zeta + 0.351479*z2)
                 + x*(-4.058673 - 3.675859*zeta - 0.640003*z2);
 
-            const Real p1 =
+            const double p1 =
                 (3.017395 + 2.117133*zeta + 0.370294*z2)
                 + x*(-0.869789 - 0.565886*zeta - 0.096312*z2);
 
-            const Real p2 =
+            const double p2 =
                 (0.110987 + 0.070103*zeta + 0.011557*z2)
                 + x*(-0.005200 - 0.003240*zeta - 0.000519*z2);
 
             u0 = p0 + p1 * x2 + p2 * x4;
         }
 
-        Real theta0 = atan((u0 - xabs) / a);
-        Real u02 = u0*u0;
-        Real eu0 = exp(-u02);
-        Real p   = (theta0 + pi/2) / ((1 - eu0)*theta0 + (1 + eu0)*pi/2);
+        double theta0 = atan((u0 - xabs) / a);
+        double u02 = u0*u0;
+        double eu0 = exp(-u02);
+        double p   = (theta0 + pi/2) / ((1 - eu0)*theta0 + (1 + eu0)*pi/2);
 
-        Real R1, theta, u, R2, r;
+        double R1, theta, u, R2, r;
         while (true) {
-            // draw two uniform randoms
             R1 = urand(rng);
             r  = urand(rng);
 
-            // pick sampling regime
+            /* pick sampling regime */
             if (R1 <= p) theta = -pi/2 + r * (theta0 + pi/2);
             else         theta = theta0 + r * (pi/2 - theta0);
 
             u = a * tan(theta) + xabs;
-            if (!isfinite(u)) continue;
+            if (!std::isfinite(u)) continue;
 
             R2 = urand(rng);
 
@@ -296,11 +356,15 @@ Real u_parallel(Real x, Real sqrt_temp, xso::rng& rng) {
     }
 }
 
-// scatter_angle(): sample scattering angle cosine
-// returns mu = cos(theta) from RASCAS dipole distribution
-Real scatter_angle(Real x, xso::rng& rng) {
-    Real r = urand(rng);
-    Real A, B;
+/**
+ * @brief sample the scattering angle cosine from the RASCAS dipole distribution.
+ * @param x    dimensionless frequency in the atom frame
+ * @param rng  per-photon random number generator
+ * @return mu = cos(theta) of the scattering angle
+ */
+double scatter_angle(double x, xso::rng& rng) {
+    double r = urand(rng);
+    double A, B;
 
     if (fabs(x) < 0.2) {
         B = 6.0 * (2.0 * r - 1.0);
@@ -314,108 +378,134 @@ Real scatter_angle(Real x, xso::rng& rng) {
     return std::cbrt(A + B) - std::cbrt(A - B);
 }
 
-// scatter(): perform resonant scattering in HI atom rest frame
-void scatter(Photon& phot, Grid& g, vector<Real>& mom_x, vector<Real>& mom_y, vector<Real>& mom_z, 
-             xso::rng& rng, const bool recoil, const bool isotropic) {
+/**
+ * @brief perform a resonant scattering event.
+ *
+ * samples the scattering atom velocity, computes the new photon
+ * direction and frequency via partial redistribution, and deposits
+ * the momentum (and optionally energy) change onto the grid.
+ *
+ * @param phot  photon to scatter (direction, frequency updated in place)
+ * @param g     grid with physical fields and momentum arrays
+ * @param rng   per-photon random number generator
+ */
+void scatter(Photon& phot, Grid& g, xso::rng& rng) {
     int cell_idx = phot.cell_idx;
 
-    Real sqrt_temp = g.sqrt_temp[cell_idx];
-    Real vth = vth_const * sqrt_temp;
+    double sqrt_temp = g.sqrt_temp[cell_idx];
+    double vth = vth_const * sqrt_temp;
 
-    Real u_bulk_x = g.vx[cell_idx] / vth;
-    Real u_bulk_y = g.vy[cell_idx] / vth;
-    Real u_bulk_z = g.vz[cell_idx] / vth;
+    double u_bulk_x = g.ux[cell_idx];
+    double u_bulk_y = g.uy[cell_idx];
+    double u_bulk_z = g.uz[cell_idx];
 
-    // transform photon freq to local bulk frame
-    Real dx = phot.dir_x;
-    Real dy = phot.dir_y;
-    Real dz = phot.dir_z;
+    /* transform photon freq to local bulk frame */
+    double dx = phot.dir_x;
+    double dy = phot.dir_y;
+    double dz = phot.dir_z;
 
-    Real x = phot.x;
+    double x = phot.x;
 
-    Real dir_dot_v = u_bulk_x * dx + u_bulk_y * dy + u_bulk_z * dz;
-    Real x_local   = x - dir_dot_v;
+    double dir_dot_v = u_bulk_x*dx + u_bulk_y*dy + u_bulk_z*dz;
+    double x_local   = x - dir_dot_v;
 
-    // sample velocity of scattering atom
-    Real u_paral = u_parallel(x_local, sqrt_temp, rng);
+    /* sample velocity of scattering atom */
+    double u_paral = u_parallel(x_local, sqrt_temp, rng);
 
-    // transform to atom frame
+    /* transform x_local to atom frame */
     x_local -= u_paral;
 
-    // sample perpendicular velocity components of atom using box muller
-    Real u1 = urand(rng);
-    Real u2 = urand(rng);
+    /* sample perpendicular velocity components of
+     * atom using box-muller method */
+    double u1 = urand(rng);
+    double u2 = urand(rng);
     if (u1 < 1e-16) u1 = 1e-16;
 
-    Real R = sqrt(-log(u1));
-    Real theta = two_pi * u2;
+    double R = sqrt(-log(u1));
+    double theta = two_pi * u2;
 
-    Real u_perp1 = R * cos(theta);
-    Real u_perp2 = R * sin(theta);
+    double u_perp1 = R * cos(theta);
+    double u_perp2 = R * sin(theta);
 
-    // find basis that velocity components of atom are in
-    // a = random vector to cross with photon direction vector
-    Real ax = (fabs(dx) < 0.9) ? 1.0 : 0.0;
-    Real ay = (ax != 0.0) ? 0.0 : 1.0;
+    /* find orthonormal basis for atom velocity decomposition */
+    double ax = (fabs(dx) < 0.9) ? 1.0 : 0.0;
+    double ay = (ax != 0.0) ? 0.0 : 1.0;
 
-    // basis vector 2, since photon's dir is basis vector 1
-    Real e2x = (-dz*ay);
-    Real e2y = (dz*ax);
-    Real e2z = (dx*ay) - (dy*ax);
+    /* basis vector 2 */
+    double e2x = (-dz*ay);
+    double e2y = (dz*ax);
+    double e2z = (dx*ay) - (dy*ax);
 
-    // normalize
-    Real e2_norm = 1.0 / sqrt(e2x*e2x + e2y*e2y + e2z*e2z);
-    e2x *= e2_norm; e2y *= e2_norm, e2z *= e2_norm;
+    double e2_norm = 1.0 / sqrt(e2x*e2x + e2y*e2y + e2z*e2z);
+    e2x *= e2_norm; e2y *= e2_norm; e2z *= e2_norm;
 
-    // basis vector 3
-    Real e3x = (dy*e2z) - (dz*e2y);
-    Real e3y = (dz*e2x) - (dx*e2z);
-    Real e3z = (dx*e2y) - (dy*e2x);
+    /* basis vector 3 */
+    double e3x = (dy*e2z) - (dz*e2y);
+    double e3y = (dz*e2x) - (dx*e2z);
+    double e3z = (dx*e2y) - (dy*e2x);
 
-    // normalize if needed
-    Real e3_norm_sq = e3x*e3x + e3y*e3y + e3z*e3z;
+    /* normalize if needed */
+    double e3_norm_sq = e3x*e3x + e3y*e3y + e3z*e3z;
     if (fabs(e3_norm_sq - 1.0) > 1e-12) {
-        Real e3_norm = 1.0 / sqrt(e3_norm_sq);
-        e3x *= e3_norm; e3y *= e3_norm, e3z *= e3_norm;
+        double e3_norm = 1.0 / sqrt(e3_norm_sq);
+        e3x *= e3_norm; e3y *= e3_norm; e3z *= e3_norm;
     }
 
-    // sample scattering angle
-    Real cosine;
-    if (!isotropic) cosine = scatter_angle(x_local, rng);
-    else cosine = urand(rng)*2.0 - 1.0;
-    cosine = max(-1.0, min(1.0, cosine));
-    Real sine = sqrt(1.0 - cosine * cosine);
+    /* sample scattering angle */
+    double cosine;
+    #if PHASE_FUNCTION == ISOTROPIC
+        cosine = urand(rng)*2.0 - 1.0;
+    #else
+        cosine = scatter_angle(x_local, rng);
+    #endif
+    cosine = std::max(-1.0, std::min(1.0, cosine));
+    double sine = sqrt(1.0 - cosine*cosine);
 
-    // sample azimuthal angle uniformly
-    Real phi = urand(rng) * two_pi;
-    Real cosphi, sinphi;
+    /* sample azimuthal angle uniformly */
+    double phi = urand(rng) * two_pi;
+    double cosphi, sinphi;
     sincos(phi, &sinphi, &cosphi);
 
-    // generate new direction vector
-    Real new_dx = cosine*dx + sine*(cosphi*e2x + sinphi*e3x);
-    Real new_dy = cosine*dy + sine*(cosphi*e2y + sinphi*e3y);
-    Real new_dz = cosine*dz + sine*(cosphi*e2z + sinphi*e3z);
+    /* generate new direction vector */
+    double new_dx = cosine*dx + sine*(cosphi*e2x + sinphi*e3x);
+    double new_dy = cosine*dy + sine*(cosphi*e2y + sinphi*e3y);
+    double new_dz = cosine*dz + sine*(cosphi*e2z + sinphi*e3z);
 
-    // normalize in case of numerical drift
-    Real norm = new_dx*new_dx + new_dy*new_dy + new_dz*new_dz;
+    /* normalize in case of numerical drift */
+    double norm = new_dx*new_dx + new_dy*new_dy + new_dz*new_dz;
     if (fabs(norm - 1.0) > 1e-12) {
-        Real norm = 1.0 / sqrt(norm);
+        double norm = 1.0 / sqrt(norm);
         new_dx *= norm; new_dy *= norm; new_dz *= norm;
     }
 
-    // dot product of (dimensionless) velocity and new direction
-    Real u_dot_k = new_dx*u_bulk_x + new_dy*u_bulk_y + new_dz*u_bulk_z;
-    x_local     += u_dot_k + u_paral*cosine + sine*(u_perp1*cosphi + u_perp2*sinphi);
-    if (recoil) x_local += 2.6e-4 * (1e2 / sqrt_temp) * (cosine - 1);
+    /* compute outgoing frequency in bulk frame */
+    double u_dot_k = new_dx*u_bulk_x + new_dy*u_bulk_y + new_dz*u_bulk_z;
+    x_local       += u_dot_k + u_paral*cosine + sine*(u_perp1*cosphi + u_perp2*sinphi);
+    #if RECOIL == TRUE
+        x_local += 2.6e-4 * (1e2 / sqrt_temp) * (cosine - 1);
+    #endif
 
-    // photon momentum losses added to grid (approximate since shifts in x barely shift nu)
-    // scale by photon weight (number of physical photons this packet represents)
+    /* deposit momentum change onto grid, scaled by packet weight */
+
+    double nu_old = nu_alpha * (1 + (x*vth/c));
+    double nu_new = nu_alpha * (1 + (x_local*vth/c));
+
     double w = phot.weight;
-    Real px = hnu_by_c * (dx - new_dx);
-    Real py = hnu_by_c * (dy - new_dy);
-    Real pz = hnu_by_c * (dz - new_dz);
+    double px = h_by_c * (nu_old*dx - nu_new*new_dx);
+    double py = h_by_c * (nu_old*dy - nu_new*new_dy);
+    double pz = h_by_c * (nu_old*dz - nu_new*new_dz);
 
-    mom_x[cell_idx] += w * px; mom_y[cell_idx] += w * py; mom_z[cell_idx] += w * pz;
+    #pragma omp atomic
+    g.mom_x[cell_idx] += w * px;
+    #pragma omp atomic
+    g.mom_y[cell_idx] += w * py;
+    #pragma omp atomic
+    g.mom_z[cell_idx] += w * pz;
+
+    #if ENERGY_DEPOSIT == DIRECT
+        #pragma omp atomic
+        g.energy[cell_idx] += w * h_by_c * (nu_old - nu_new);
+    #endif
 
     phot.dir_x = new_dx; phot.dir_y = new_dy; phot.dir_z = new_dz;
     phot.x = x_local;

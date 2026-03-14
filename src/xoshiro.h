@@ -5,24 +5,95 @@
 /// SPDX-License-Identifier: MIT
 #pragma once
 
+#include <algorithm>
 #include <array>
-#include <bit>
 #include <cassert>
 #include <chrono>
-#include <concepts>
-#include <format>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <random>
+#include <sstream>
 #include <string>
 #include <type_traits>
 
 namespace xso {
 
-/// @brief A C++ concept that lets us distinguish e.g. a @c std::normal_distribution from a @c std::vector
-/// @note  Relies on STL distributions defining a @c param_type type that STL containers do not.
+// --------------------------------------------------------------------------------------------------------------------
+// C++17-compatible replacements for C++20 <bit> functions
+// --------------------------------------------------------------------------------------------------------------------
+namespace detail {
+
+/// @brief Rotate left (replaces std::rotl from C++20 <bit>)
+template<typename T>
+constexpr T rotl(T x, int s) noexcept {
+    static_assert(std::is_unsigned<T>::value, "rotl requires unsigned type");
+    constexpr int N = std::numeric_limits<T>::digits;
+    const int r = s % N;
+    if (r == 0) return x;
+    return static_cast<T>((x << r) | (x >> (N - r)));
+}
+
+/// @brief Count trailing zeros (replaces std::countr_zero from C++20 <bit>)
+template<typename T>
+constexpr int countr_zero(T x) noexcept {
+    static_assert(std::is_unsigned<T>::value, "countr_zero requires unsigned type");
+    if (x == 0) return std::numeric_limits<T>::digits;
+#if defined(__GNUC__) || defined(__clang__)
+    if constexpr (sizeof(T) <= sizeof(unsigned int))
+        return __builtin_ctz(static_cast<unsigned int>(x));
+    else
+        return __builtin_ctzll(static_cast<unsigned long long>(x));
+#else
+    int count = 0;
+    while ((x & 1) == 0) {
+        x >>= 1;
+        ++count;
+    }
+    return count;
+#endif
+}
+
+/// @brief Bit width - number of bits needed to represent x (replaces std::bit_width from C++20 <bit>)
+template<typename T>
+constexpr int bit_width(T x) noexcept {
+    static_assert(std::is_unsigned<T>::value, "bit_width requires unsigned type");
+    if (x == 0) return 0;
+#if defined(__GNUC__) || defined(__clang__)
+    if constexpr (sizeof(T) <= sizeof(unsigned int))
+        return std::numeric_limits<unsigned int>::digits - __builtin_clz(static_cast<unsigned int>(x));
+    else
+        return std::numeric_limits<unsigned long long>::digits - __builtin_clzll(static_cast<unsigned long long>(x));
+#else
+    int width = 0;
+    while (x != 0) {
+        x >>= 1;
+        ++width;
+    }
+    return width;
+#endif
+}
+
+/// @brief Largest power of 2 not greater than x (replaces std::bit_floor from C++20 <bit>)
+template<typename T>
+constexpr T bit_floor(T x) noexcept {
+    static_assert(std::is_unsigned<T>::value, "bit_floor requires unsigned type");
+    if (x == 0) return 0;
+    return T{1} << (bit_width(x) - 1);
+}
+
+} // namespace detail
+
+// --------------------------------------------------------------------------------------------------------------------
+// Type traits to replace C++20 concepts
+// --------------------------------------------------------------------------------------------------------------------
+
+/// @brief Type trait to detect if D is a distribution (has param_type member)
+template<typename D, typename = void>
+struct is_distribution : std::false_type {};
+
 template<typename D>
-concept Distribution = requires { typename D::param_type; };
+struct is_distribution<D, std::void_t<typename D::param_type>> : std::true_type {};
 
 /// @brief  The main `xso::generator` class combines a State and a Scrambler to create a PRNG.
 /// @tparam State     Provides access to the words of state, and has a @c step() method to advance them.
@@ -60,7 +131,7 @@ public:
     static constexpr result_type max() noexcept { return std::numeric_limits<result_type>::max(); }
 
     /// Returns a name for this generator.
-    static constexpr auto xso_name() { return std::format("{}{}", State::xso_name(), Scrambler::xso_name()); }
+    static std::string xso_name() { return State::xso_name() + Scrambler::xso_name(); }
 
     /// @brief Default constructor seeds the full state randomly.
     /// @note  This will produce a high quality stream of random outputs that are different on each run.
@@ -151,7 +222,7 @@ public:
 
     /// @brief Returns a single integer value from a uniform distribution over @c [a,b].
     /// @note  No error checking is done and the behaviour is undefined if a > b.
-    template<std::integral T>
+    template<typename T, typename = typename std::enable_if<std::is_integral<T>::value>::type>
     constexpr T sample(T a, T b)
     {
         return std::uniform_int_distribution<T>{a, b}(*this);
@@ -159,7 +230,7 @@ public:
 
     /// @brief Returns a single real value from a uniform distribution over @c [a,b).
     /// @note  No error checking is done and the behaviour is undefined if a > b.
-    template<std::floating_point T>
+    template<typename T, typename = typename std::enable_if<std::is_floating_point<T>::value>::type, typename = void>
     constexpr T sample(T a, T b)
     {
         return std::uniform_real_distribution<T>{a, b}(*this);
@@ -167,7 +238,7 @@ public:
 
     /// @brief Returns a single index from a uniform distribution over @c [0,len).
     /// @note  No error checking is done and the behaviour is undefined if len = 0.
-    template<std::integral T>
+    template<typename T, typename = typename std::enable_if<std::is_integral<T>::value>::type>
     constexpr T index(T len)
     {
         return sample(T{0}, len - 1);
@@ -175,8 +246,9 @@ public:
 
     /// @brief Returns a single value from an iteration -- all elements are equally likely to be returned.
     /// @note  No error checking is done and the behaviour is undefined if e < b.
-    template<std::input_iterator T>
-    constexpr auto sample(T b, T e)
+    template<typename T, typename = typename std::enable_if<
+        std::is_base_of<std::input_iterator_tag, typename std::iterator_traits<T>::iterator_category>::value>::type>
+    constexpr auto sample(T b, T e) -> decltype(*b)
     {
         // Edge case?
         auto len = std::distance(b, e);
@@ -198,29 +270,33 @@ public:
     /// @brief Pick @c n elements from an iteration @c [b,e) without replacement & put the chosen samples in @c dst.
     /// @note  See the documentation for @c std::sample(...) for more details.
     /// @note  No error checking is done and the behaviour is undefined if e < b.
-    template<std::input_iterator Src, typename Dst>
-    constexpr Dst sample(Src b, Src e, Dst dst, std::unsigned_integral auto n)
+    template<typename Src, typename Dst, typename N,
+             typename = typename std::enable_if<std::is_unsigned<N>::value>::type>
+    constexpr Dst sample(Src b, Src e, Dst dst, N n)
     {
         return std::sample(b, e, dst, n, *this);
     }
 
     /// @brief Pick @c n elements from a container without replacement & put the chosen samples in @c dst.
     /// @note  See the documentation for @c std::sample(...) for more details.
-    template<typename Src, typename Dst>
-    constexpr auto sample(const Src& src, Dst dst, std::unsigned_integral auto n)
+    template<typename Src, typename Dst, typename N,
+             typename = typename std::enable_if<std::is_unsigned<N>::value>::type>
+    constexpr auto sample(const Src& src, Dst dst, N n)
     {
         return sample(std::cbegin(src), std::cend(src), dst, n);
     }
 
     /// @brief Returns a single random variate drawn from a distribution.
     /// @param dist The distribution in question e.g. a @c std::normal_distribution object.
-    constexpr auto sample(Distribution auto& dist) { return dist(*this); }
+    template<typename D, typename = typename std::enable_if<is_distribution<D>::value>::type>
+    constexpr auto sample(D& dist) { return dist(*this); }
 
     /// @brief Pushes @c n samples from a distribution into a destination iterator.
     /// @param dist The distribution in question e.g. a @c std::normal_distribution object.
     /// @param dst  An iterator to the start of where we put the samples.
-    template<typename Iter>
-    constexpr Iter sample(Distribution auto& dist, Iter dst, std::unsigned_integral auto n)
+    template<typename D, typename Iter, typename N,
+             typename = typename std::enable_if<is_distribution<D>::value && std::is_unsigned<N>::value>::type>
+    constexpr Iter sample(D& dist, Iter dst, N n)
     {
         while (n-- != 0) *dst++ = dist(*this);
         return dst;
@@ -235,7 +311,8 @@ public:
 
     /// @brief Shuffles the elements in an iteration.
     /// @note  No error checking is done and the behaviour is undefined if e < b.
-    template<std::random_access_iterator Iter>
+    template<typename Iter, typename = typename std::enable_if<
+        std::is_same<std::random_access_iterator_tag, typename std::iterator_traits<Iter>::iterator_category>::value>::type>
     constexpr void shuffle(Iter b, Iter e)
     {
         std::shuffle(b, e, *this);
@@ -311,7 +388,8 @@ private:
 /// @brief  The state class for the @c xoshiro family of pseudorandom generators.
 /// @tparam N, T The state is stored as @c N words of some unsigned integer type @c T
 /// @tparam A, B These are the parameters used in the @c step() method that advances the state.
-template<std::size_t N, std::unsigned_integral T, std::uint8_t A, std::uint8_t B>
+template<std::size_t N, typename T, std::uint8_t A, std::uint8_t B,
+         typename = typename std::enable_if<std::is_unsigned<T>::value>::type>
 class xoshiro {
 public:
     /// @brief The type of the words of state
@@ -324,9 +402,11 @@ public:
     static constexpr std::size_t bit_count() { return N * std::numeric_limits<T>::digits; }
 
     /// @brief Returns a name for this state.
-    static constexpr auto xso_name()
+    static std::string xso_name()
     {
-        return std::format("xoshiro<{}x{},{},{}>", N, std::numeric_limits<T>::digits, A, B);
+        std::ostringstream oss;
+        oss << "xoshiro<" << N << "x" << std::numeric_limits<T>::digits << "," << int(A) << "," << int(B) << ">";
+        return oss.str();
     }
 
     /// @brief Read-only access to the i'th state word.
@@ -356,7 +436,7 @@ public:
             m_state[1] ^= m_state[2];
             m_state[0] ^= m_state[3];
             m_state[2] ^= tmp;
-            m_state[3] = std::rotl(m_state[3], B);
+            m_state[3] = detail::rotl(m_state[3], B);
         }
         else if constexpr (N == 8) {
             auto tmp = m_state[1] << A;
@@ -369,7 +449,7 @@ public:
             m_state[0] ^= m_state[6];
             m_state[6] ^= m_state[7];
             m_state[6] ^= tmp;
-            m_state[7] = std::rotl(m_state[7], B);
+            m_state[7] = detail::rotl(m_state[7], B);
         }
         else {
             // There is no discernible pattern to the way xoshiro works as the number of words of state increases.
@@ -412,7 +492,8 @@ private:
 /// @brief  The state for the @c xoroshiro family of pseudorandom generators.
 /// @tparam N, T    The state is stored as @c N words of some unsigned integer type @c T
 /// @tparam A, B, C These are the parameters used in the @c step() method that advances the state.
-template<std::size_t N, std::unsigned_integral T, std::uint8_t A, std::uint8_t B, std::uint8_t C>
+template<std::size_t N, typename T, std::uint8_t A, std::uint8_t B, std::uint8_t C,
+         typename = typename std::enable_if<std::is_unsigned<T>::value>::type>
 class xoroshiro {
 public:
     /// @brief The type of the words of state
@@ -425,9 +506,11 @@ public:
     static constexpr std::size_t bit_count() { return N * std::numeric_limits<T>::digits; }
 
     /// @brief Returns a name for this state.
-    static constexpr auto xso_name()
+    static std::string xso_name()
     {
-        return std::format("xoroshiro<{}x{},{},{},{}>", N, std::numeric_limits<T>::digits, A, B, C);
+        std::ostringstream oss;
+        oss << "xoroshiro<" << N << "x" << std::numeric_limits<T>::digits << "," << int(A) << "," << int(B) << "," << int(C) << ">";
+        return oss.str();
     }
 
     /// @brief Read-only access to the i'th state word.
@@ -510,8 +593,8 @@ private:
 
         // Update the first and final words of state
         s1 ^= s0;
-        m_state[N - 2] = std::rotl(s0, A) ^ (s1 << B) ^ s1;
-        m_state[N - 1] = std::rotl(s1, C);
+        m_state[N - 2] = detail::rotl(s0, A) ^ (s1 << B) ^ s1;
+        m_state[N - 1] = detail::rotl(s1, C);
     }
 
     /// @brief Step the state forward where we shuffle array indices instead of the state words.
@@ -528,8 +611,8 @@ private:
 
         // Update the values for the final & first words of state
         s_final ^= s_first;
-        m_state[i_final] = std::rotl(s_first, A) ^ (s_final << B) ^ s_final;
-        m_state[i_first] = std::rotl(s_final, C);
+        m_state[i_final] = detail::rotl(s_first, A) ^ (s_final << B) ^ s_final;
+        m_state[i_first] = detail::rotl(s_final, C);
 
         // Step the index of the final word of state -- this shuffles the state array down a slot.
         m_final = i_first;
@@ -548,10 +631,15 @@ private:
 template<auto S, std::size_t w>
 struct star {
     /// @brief Reduces the state input to a single word of output.
-    constexpr auto operator()(const auto& state) const { return state[w] * S; }
+    template<typename State>
+    constexpr auto operator()(const State& state) const { return state[w] * S; }
 
     /// @brief Returns a name for this scrambler.
-    static constexpr auto xso_name() { return std::format("star<{:x},{}>", S, w); }
+    static std::string xso_name() {
+        std::ostringstream oss;
+        oss << "star<" << std::hex << S << "," << std::dec << w << ">";
+        return oss.str();
+    }
 };
 
 /// @brief  The "**" scrambler returns a scrambled version of one of the state words.
@@ -560,10 +648,15 @@ struct star {
 template<auto S, auto R, auto T, std::size_t w>
 struct star_star {
     /// @brief Reduces the state input to a single word of output.
-    constexpr auto operator()(const auto& state) const { return std::rotl(state[w] * S, R) * T; }
+    template<typename State>
+    constexpr auto operator()(const State& state) const { return detail::rotl(state[w] * S, R) * T; }
 
     /// @brief Returns a name for this scrambler.
-    static constexpr auto xso_name() { return std::format("star_star<{:x},{},{}>", S, R, w); }
+    static std::string xso_name() {
+        std::ostringstream oss;
+        oss << "star_star<" << std::hex << S << "," << std::dec << R << "," << w << ">";
+        return oss.str();
+    }
 };
 
 /// @brief  The "+" scrambler returns the sum of two of the state words.
@@ -571,10 +664,15 @@ struct star_star {
 template<std::size_t w0, std::size_t w1>
 struct plus {
     /// @brief Reduces the state input to a single word of output.
-    constexpr auto operator()(const auto& state) const { return state[w0] + state[w1]; }
+    template<typename State>
+    constexpr auto operator()(const State& state) const { return state[w0] + state[w1]; }
 
     /// @brief Returns a name for this scrambler.
-    static constexpr auto xso_name() { return std::format("plus<{},{}>", w0, w1); }
+    static std::string xso_name() {
+        std::ostringstream oss;
+        oss << "plus<" << w0 << "," << w1 << ">";
+        return oss.str();
+    }
 };
 
 /// @brief  The "++" scrambler returns a scrambled version of two of the state words.
@@ -583,10 +681,15 @@ struct plus {
 template<auto R, std::size_t w0, std::size_t w1>
 struct plus_plus {
     /// @brief Reduces the state input to a single word of output.
-    constexpr auto operator()(const auto& state) const { return std::rotl(state[w0] + state[w1], R) + state[w0]; }
+    template<typename State>
+    constexpr auto operator()(const State& state) const { return detail::rotl(state[w0] + state[w1], R) + state[w0]; }
 
     /// @brief Returns a name for this scrambler.
-    static constexpr auto xso_name() { return std::format("plus_plus<{},{},{}>", R, w0, w1); }
+    static std::string xso_name() {
+        std::ostringstream oss;
+        oss << "plus_plus<" << R << "," << w0 << "," << w1 << ">";
+        return oss.str();
+    }
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -650,7 +753,7 @@ namespace xso::internal {
 
 /// @brief  Riffle a word into two other words containing the bits from @c src interleaved with zeros.
 /// @return With an 8-bit word @c src = `abcdefgh`, on return @c lo = `a0b0c0d0 and @c hi = `e0f0g0h0`.
-template<std::unsigned_integral word_type>
+template<typename word_type, typename = typename std::enable_if<std::is_unsigned<word_type>::value>::type>
 constexpr void
 riffle(word_type src, word_type& lo, word_type& hi)
 {
@@ -676,7 +779,7 @@ riffle(word_type src, word_type& lo, word_type& hi)
 /// @brief  Riffle an array of unsigneds into two others which will get the bits from @c src interleaved with zeros.
 /// @return We treat @c [lo|hi] as contiguous storage and fill the elements of @c lo first and then @c hi
 /// @note   You can reuse @c src for the output array @c lo -- the call @c riffle(src,src,hi) will work fine.
-template<std::unsigned_integral word_type, std::size_t N>
+template<typename word_type, std::size_t N, typename = typename std::enable_if<std::is_unsigned<word_type>::value>::type>
 constexpr void
 riffle(const std::array<word_type, N>& src, std::array<word_type, N>& lo, std::array<word_type, N>& hi)
 {
@@ -710,7 +813,7 @@ riffle(const std::array<word_type, N>& src, std::array<word_type, N>& lo, std::a
 /// @param  J_is_pow2 If true we compute x^(2^J) mod c(x) -- allows e.g. e = 2^100 which overflows a @c std::size_t
 /// @return We return the coefficients of r(x) = x^e mod c(x) in the same type of array as @c p.
 /// @note   linters will (reasonably) complain that the complexity of this method is rather high!
-template<std::unsigned_integral T, std::size_t N>
+template<typename T, std::size_t N, typename = typename std::enable_if<std::is_unsigned<T>::value>::type>
 constexpr std::array<T, N>
 reduce(const std::array<T, N>& p, std::size_t J, bool J_is_pow2)
 {
@@ -742,10 +845,10 @@ reduce(const std::array<T, N>& p, std::size_t J, bool J_is_pow2)
     auto set = [=](auto& poly, std::size_t i) { poly[word(i)] |= mask(i); };
 
     // lambda: Returns the index for the least significant set bit in the argument or `npos` if none set.
-    auto lsb = [=](T w) { return w == 0 ? npos : static_cast<std::size_t>(std::countr_zero(w)); };
+    auto lsb = [=](T w) { return w == 0 ? npos : static_cast<std::size_t>(xso::detail::countr_zero(w)); };
 
     // lambda: Returns the index for the most significant set bit in the argument or `npos` if none set.
-    auto msb = [=](T w) { return static_cast<std::size_t>(std::bit_width(w) - 1); };
+    auto msb = [=](T w) { return static_cast<std::size_t>(xso::detail::bit_width(w) - 1); };
 
     // lambda: Returns the first set coefficient in poly or `npos` if the coefficients are all zero.
     auto first_set = [=](const auto& poly) {
@@ -846,8 +949,8 @@ reduce(const std::array<T, N>& p, std::size_t J, bool J_is_pow2)
     if (J == n) return p;
 
     // Case e = J > n: We use a square & multiply algorithm:
-    // Note that if e.g. J = 0b00010111 then std::bit_floor(J) = 0b00010000.
-    std::size_t J_bit = std::bit_floor(J);
+    // Note that if e.g. J = 0b00010111 then bit_floor(J) = 0b00010000.
+    std::size_t J_bit = xso::detail::bit_floor(J);
 
     // Start with r(x) = x mod c(x) which takes care of the most significant binary digit in J.
     set(r, 1);
@@ -973,7 +1076,7 @@ public:
         // number will probably overflow a std::size_t so we must keep everything in log 2 form. First we find the
         // smallest n such that 2^n >= n_partitions - 1.
         // Note if n_partitions is 128 the following gives n = 7 and does the same if n = 100.
-        auto n = static_cast<std::size_t>(std::bit_width(n_partitions - 1));
+        auto n = static_cast<std::size_t>(detail::bit_width(n_partitions - 1));
 
         // We will create 2^n partitions which is probably more than needed but the wastage is negligible.
         // To create those 2^n partitions we must be able to jump ahead 2^(n_bits - n) steps many times.
@@ -1105,7 +1208,8 @@ characteristic_polynomial(const State&)
 /// @param  N We want to jump by J = N steps or J = 2^N steps (for really huge jumps).
 /// @param  N_is_pow2 If true we want to jump by 2^N steps -- allows for say J = 2^100 which overflows normal ints.
 /// @return Returns the jump polynomial x^J mod c(x) as a @c bit::polynomial
-template<std::unsigned_integral Block, typename Allocator>
+template<typename Block, typename Allocator,
+         typename = typename std::enable_if<std::is_unsigned<Block>::value>::type>
 auto
 jump_polynomial(const bit::polynomial<Block, Allocator>& c, std::size_t N, bool N_is_pow2 = false)
 {
@@ -1116,7 +1220,8 @@ jump_polynomial(const bit::polynomial<Block, Allocator>& c, std::size_t N, bool 
 /// @brief Jumps a state/generator ahead in its random number stream by @c J steps.
 /// @param jump_poly The precomputed bit-polynomial x^J mod c(x) where c(x) is the characteristic polynomial.
 /// @note  You get @c jump_poly by first calling the @c jump_polynomial method for the jump in question.
-template<typename State, std::unsigned_integral Block, typename Allocator>
+template<typename State, typename Block, typename Allocator,
+         typename = typename std::enable_if<std::is_unsigned<Block>::value>::type>
 void
 jump(State& state, const bit::polynomial<Block, Allocator>& jump_poly)
 {
@@ -1139,37 +1244,29 @@ jump(State& state, const bit::polynomial<Block, Allocator>& jump_poly)
 
 #endif // BIT
 
-/// @brief A concept that matches any type that has an accessible `xso_name()` class `method.
+// --------------------------------------------------------------------------------------------------------------------
+// Type trait to detect if T has a static xso_name() method returning std::string
+// --------------------------------------------------------------------------------------------------------------------
+namespace xso {
+namespace detail {
+
+template<typename T, typename = void>
+struct has_xso_name_impl : std::false_type {};
+
 template<typename T>
-concept has_xso_name_class_method = requires {
-    { T::xso_name() } -> std::convertible_to<std::string>;
-};
+struct has_xso_name_impl<T, std::void_t<decltype(T::xso_name())>>
+    : std::is_convertible<decltype(T::xso_name()), std::string> {};
 
-/// @brief Connect our classes to @c std::format and friends by specializing the @c std:formatter struct.
-/// @note  This uses the fact that our classes have a class method @c xso_name() that returns a string.
-/// @note  Specializations of @c std::formatter are always in the @c std namespace.
-template<has_xso_name_class_method T>
-struct std::formatter<T> {
+} // namespace detail
+} // namespace xso
 
-    /// @brief Parse the format specifier -- currently only handle the default empty specifier
-    constexpr auto parse(const std::format_parse_context& ctx)
-    {
-        auto it = ctx.begin();
-        assert(it == ctx.end() || *it == '}');
-        return it;
-    }
-
-    /// @brief Push out a formatted xso::generator using its @c xso_name(...) method.
-    template<class FormatContext>
-    auto format(const T&, FormatContext& ctx) const
-    {
-        return std::format_to(ctx.out(), "{}", T::xso_name());
-    }
-};
+/// @brief Type trait that matches any type that has an accessible `xso_name()` class method.
+template<typename T>
+struct has_xso_name_class_method : xso::detail::has_xso_name_impl<T> {};
 
 /// @brief The usual output stream operator for an xso::generator, State, or Scrambler.
-template<has_xso_name_class_method T>
-std::ostream&
+template<typename T>
+typename std::enable_if<has_xso_name_class_method<T>::value, std::ostream&>::type
 operator<<(std::ostream& s, const T&)
 {
     s << T::xso_name();
