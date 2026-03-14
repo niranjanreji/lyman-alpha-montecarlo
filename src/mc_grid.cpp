@@ -295,7 +295,7 @@ void build_fields(Grid* grid, DensityFunc density_fn, TemperatureFunc temperatur
 /* Tolerances for discontinuity checks (following COLT) */
 static constexpr double atau_density_tol  = 10.0;  /* max relative a*k0 ratio */
 static constexpr double atau_velocity_tol = 10.0;  /* max velocity jump [vth]  */
-static constexpr int    n_atau_dirs       = 100;    /* number of ray directions */
+static constexpr int    n_atau_dirs       = 48;    /* number of ray directions */
 
 void minimum_a_tau(Grid* grid) {
     /* sample directions uniformly on the sphere */
@@ -326,12 +326,20 @@ void minimum_a_tau(Grid* grid) {
 
     /* now test a*tau and find the minimum for each cell */
     for (size_t cell = 0; cell < n_cells; ++cell) {
+        //std::cout << cell << std::endl;
         int iz = cell % NZ;
         int iy = (cell / NZ) % NY;
         int ix = (cell) / (NZ * NY);
 
         /* home cell properties for discontinuity checks */
         double ak0_home = ak0[cell];
+
+        /* skip cells that are optically thin at line center */
+        if (ak0_home * grid->dx < 1.0) {
+            grid->atau[cell] = 0.0;
+            continue;
+        }
+
         double vpar_home_x = grid->ux[cell];
         double vpar_home_y = grid->uy[cell];
         double vpar_home_z = grid->uz[cell];

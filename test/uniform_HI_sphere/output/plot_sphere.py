@@ -112,7 +112,10 @@ ax.set_xlim(-30, 30)
 ax.tick_params(axis='both', labelsize=10)
 
 plt.tight_layout()
-plt.savefig("sphere_comparison.png", dpi=150)
+plt.savefig("sphere_comparison.png", dpi=200)
+
+# Display a lower-resolution version
+fig.set_dpi(200)
 plt.show()
 
 print("Saved figure to sphere_comparison.png")

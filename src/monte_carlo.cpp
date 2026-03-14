@@ -48,8 +48,7 @@ long long monte_carlo(Photons& p, Grid& g, double dt) {
         MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
     #endif
 
-    int new_photon_count;
-
+    long long new_photon_count;
     if (DT_PHOTONS > 0)
         new_photon_count = std::max(N_PHOTONS * (dt / DT_PHOTONS), 1.0);
     else
