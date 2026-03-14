@@ -54,6 +54,7 @@ All RT options are set in `rt_definitions.h`, separate from PLUTO's `definitions
 | `VOIGT_FUNCTION` | `SMITH2015` / `HUMLICEK1982` / `TASITSIOMI2006` | Voigt profile approximation |
 | `ENERGY_DEPOSIT` | `FDV` / `DIRECT` | heating rate method (see below) |
 | `RECOIL` | `TRUE` / `FALSE` | include recoil in frequency redistribution |
+| `FULLY_NEUTRAL` | `TRUE` / `FALSE` | ignore temperature when computing nHI |
 
 ### Energy deposition modes
 
@@ -84,6 +85,7 @@ When `DT_PHOTONS > 0`, the number of packets emitted per call scales as `n_emit 
 | `VERBOSE_OUTPUT` | detailed per-5% progress during MC loop |
 | `SPECTRUM_OUTPUT` | write escaped photon frequencies to `output/spectrum.txt` |
 | `POSITION_OUTPUT` | write photon position snapshots |
+| `MOMENTUM_OUTPUT` | write momentum deposited per cell to `output/momentum.txt` |
 | `POSITION_INTERVAL` | scatter interval between position snapshots |
 | `SMOOTHING` | experimental momentum smoothing |
 
@@ -117,7 +119,7 @@ void user_sources(int *n_sources, double pos[][3], double lum[]) {
 }
 ```
 
-The grid is built programmatically from these functions at startup. No external input files are needed.
+The grid is built programmatically from these functions at startup. No external input files are needed. If you would like to change the problem setup, avoid modifying the function signatures and simply modify the body. `user_setup.cpp` is necessary for code compilation.
 
 ## PLUTO coupling
 
