@@ -1,5 +1,5 @@
 # Lyman-alpha Monte Carlo Radiative Transfer
-th 
+
 A Monte Carlo radiative transfer code for Lyman-alpha photons, designed for standalone use and coupling with the PLUTO hydrodynamics code. Currently, the code is written to work with 1-D spherical hydrodynamics within PLUTO.
 
 While this code was mainly written by me, AI agents have assisted in debugging and simplifying the codebase.
