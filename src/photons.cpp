@@ -2,8 +2,7 @@
  * creates new photon packets from grid cells and point sources,
  * sampling positions, directions, and frequencies.
  *
- * Niranjan Reji, Raman Research Institute, March 2026
- * assisted by Claude (Anthropic) */
+ * Niranjan Reji, Raman Research Institute, March 2026 */
 
 #include <chrono>
 #include "common.h"

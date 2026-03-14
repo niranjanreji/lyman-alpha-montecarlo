@@ -2,8 +2,7 @@
  * lyman-alpha RT module. included by both C (split_source.c, rhs.c)
  * and C++ (pluto_interface.cpp) translation units.
  *
- * Niranjan Reji, Raman Research Institute, March 2026
- * assisted by Claude (Anthropic) */
+ * Niranjan Reji, Raman Research Institute, March 2026 */
 
 #pragma once
 

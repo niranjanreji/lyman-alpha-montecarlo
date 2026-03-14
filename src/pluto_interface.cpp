@@ -3,8 +3,7 @@
  * radial arrays onto the RT grid, runs the monte carlo, and maps
  * momentum/energy back to PLUTO's radial bins.
  *
- * Niranjan Reji, Raman Research Institute, March 2026
- * assisted by Claude (Anthropic) */
+ * Niranjan Reji, Raman Research Institute, March 2026 */
 
 #include <cstdio>
 #include "common.h"

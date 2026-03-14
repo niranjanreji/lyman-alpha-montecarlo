@@ -3,8 +3,7 @@
  * lyman-alpha radiative transfer including voigt cross sections,
  * frequency redistribution, and momentum/energy deposition.
  *
- * Niranjan Reji, Raman Research Institute, March 2026
- * assisted by Claude (Anthropic) */
+ * Niranjan Reji, Raman Research Institute, March 2026 */
 
 #include "common.h"
 #include <rt_definitions.h>
@@ -74,7 +73,7 @@ struct Boundary {
  */
 inline Boundary compute_next_boundary(Photon& phot, const Grid& g,
                                       const int ix, const int iy, const int iz) {
-    constexpr double eps = (double)1e-10;
+    constexpr double eps = 1e-10;
 
     const double px = phot.pos_x;
     const double py = phot.pos_y;
@@ -421,7 +420,14 @@ void scatter(Photon& phot, Grid& g, xso::rng& rng) {
     double u2 = urand(rng);
     if (u1 < 1e-16) u1 = 1e-16;
 
-    double R = sqrt(-log(u1));
+    /* following the COLT / RASCAS strategy */
+    double x_crit = 0;
+    #if CORE_SKIPPING == TRUE
+        if (g.atau[cell_idx] >= 1) x_crit = 0.2 * std::cbrt(g.atau[cell_idx]);
+        if (fabs(x) >= x_crit) x_crit = 0.0;
+    #endif
+
+    double R = sqrt(x_crit*x_crit - log(u1));
     double theta = two_pi * u2;
 
     double u_perp1 = R * cos(theta);
@@ -474,8 +480,8 @@ void scatter(Photon& phot, Grid& g, xso::rng& rng) {
     /* normalize in case of numerical drift */
     double norm = new_dx*new_dx + new_dy*new_dy + new_dz*new_dz;
     if (fabs(norm - 1.0) > 1e-12) {
-        double norm = 1.0 / sqrt(norm);
-        new_dx *= norm; new_dy *= norm; new_dz *= norm;
+        double inv_norm = 1.0 / sqrt(norm);
+        new_dx *= inv_norm; new_dy *= inv_norm; new_dz *= inv_norm;
     }
 
     /* compute outgoing frequency in bulk frame */

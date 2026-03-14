@@ -2,8 +2,7 @@
  * propagates them through the grid, handles scattering, and
  * collects diagnostics. supports MPI and OpenMP parallelism.
  *
- * Niranjan Reji, Raman Research Institute, March 2026
- * assisted by Claude (Anthropic) */
+ * Niranjan Reji, Raman Research Institute, March 2026 */
 
 #include <omp.h>
 #include <chrono>

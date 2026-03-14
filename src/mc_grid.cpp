@@ -2,14 +2,15 @@
  * lyman-alpha emission rate functions. builds the 3D cartesian
  * grid and populates physical fields from user-supplied functions.
  *
- * Niranjan Reji, Raman Research Institute, March 2026
- * assisted by Claude (Anthropic) */
+ * Niranjan Reji, Raman Research Institute, March 2026 */
 
 #include <cstdio>
 #include <algorithm>
 
 #include "common.h"
 #include <rt_definitions.h>
+
+void minimum_a_tau(Grid* grid);
 
 /* ---- HI fraction table (temperature_HI.dat) ---- */
 
@@ -138,6 +139,10 @@ Grid* init_grid(SourcesFunc sources_fn) {
     grid->mom_z.resize(n_cells);
     grid->energy.resize(n_cells);
 
+    #if CORE_SKIPPING == TRUE
+        grid->atau.resize(n_cells);
+    #endif
+
     fill(grid->nHI.begin(), grid->nHI.end(), 0.0);
     fill(grid->sqrt_temp.begin(), grid->sqrt_temp.end(), 0);
     fill(grid->ux.begin(), grid->ux.end(), 0.0);
@@ -261,5 +266,171 @@ void build_fields(Grid* grid, DensityFunc density_fn, TemperatureFunc temperatur
 
         /* ensure last entry is 1 */
         grid->luminosity_CDF[n_cells + n_sources - 1] = 1.0;
+    }
+
+    #if CORE_SKIPPING == TRUE 
+        minimum_a_tau(grid);
+    #endif
+}
+
+
+/* ---- core skipping computation (min(a*tau)) ---- */
+
+/**
+ * @brief precompute the non-local core-skipping estimate for every cell.
+ *
+ * For each cell, shoots rays in uniformly sampled directions from the cell
+ * center and integrates a*k0*dl (Voigt parameter times line-center opacity
+ * times path length) through successive cells. The minimum integrated a*tau
+ * over all directions is stored in grid->atau[cell].
+ *
+ * Rays are terminated early when they exit the domain, or when a
+ * discontinuity in density (>10x ratio in a*k0) or velocity (>10 vth jump)
+ * is encountered. If the immediate neighbour already triggers a
+ * discontinuity, that direction contributes 0 (no reliable non-local
+ * estimate).
+ *
+ * @param grid  pointer to initialized Grid with populated physical fields
+ */
+/* Tolerances for discontinuity checks (following COLT) */
+static constexpr double atau_density_tol  = 10.0;  /* max relative a*k0 ratio */
+static constexpr double atau_velocity_tol = 10.0;  /* max velocity jump [vth]  */
+static constexpr int    n_atau_dirs       = 100;    /* number of ray directions */
+
+void minimum_a_tau(Grid* grid) {
+    /* sample directions uniformly on the sphere */
+    xso::rng rng;
+    std::vector<double> dir_x(n_atau_dirs), dir_y(n_atau_dirs), dir_z(n_atau_dirs);
+
+    for (int i = 0; i < n_atau_dirs; ++i) {
+        double u1 = urand(rng);
+        double u2 = urand(rng);
+
+        double cosine = 2.0*u1 - 1.0;
+        double phi    = two_pi*u2;
+        double sine   = sqrt(1.0 - cosine*cosine);
+
+        dir_z[i] = cosine;
+        dir_y[i] = sine * std::sin(phi);
+        dir_x[i] = sine * std::cos(phi);
+    }
+
+    /* precompute a*k0 per cell: a * n_HI * sigma_alpha(line center) */
+    const size_t n_cells = (size_t)NX * NY * NZ;
+    std::vector<double> ak0(n_cells);
+    for (size_t i = 0; i < n_cells; ++i) {
+        double inv_sqrt_temp = 1.0 / grid->sqrt_temp[i];
+        double a = a_const * inv_sqrt_temp;
+        ak0[i] = a * grid->nHI[i] * 5.898e-12 * inv_sqrt_temp * voigt_humlicek(0, a);
+    }
+
+    /* now test a*tau and find the minimum for each cell */
+    for (size_t cell = 0; cell < n_cells; ++cell) {
+        int iz = cell % NZ;
+        int iy = (cell / NZ) % NY;
+        int ix = (cell) / (NZ * NY);
+
+        /* home cell properties for discontinuity checks */
+        double ak0_home = ak0[cell];
+        double vpar_home_x = grid->ux[cell];
+        double vpar_home_y = grid->uy[cell];
+        double vpar_home_z = grid->uz[cell];
+
+        double atau_min = INF;
+
+        for (int dir = 0; dir < n_atau_dirs; ++dir) {
+            /* e_hat is our direction unit vector */
+            double ex = dir_x[dir];
+            double ey = dir_y[dir];
+            double ez = dir_z[dir];
+
+            /* parallel velocity of home cell along this direction */
+            double vpar_home = vpar_home_x*ex + vpar_home_y*ey + vpar_home_z*ez;
+
+            /* current traversal indices (mutable) */
+            int cx = ix, cy = iy, cz = iz;
+
+            /* current position */
+            double px = grid->x_centers[ix];
+            double py = grid->y_centers[iy];
+            double pz = grid->z_centers[iz];
+
+            /* figure out direction signs (+1 or -1) */
+            const int sx = (ex > 0) ? 1 : -1;
+            const int sy = (ey > 0) ? 1 : -1;
+            const int sz = (ez > 0) ? 1 : -1;
+
+            double atau_local = 0.0;
+            bool first_step = true;
+
+            /* propagation + accumulation loop */
+            while (true) {
+                /* face indices that e_hat points to from current cell */
+                int fx = cx + (sx > 0);
+                int fy = cy + (sy > 0);
+                int fz = cz + (sz > 0);
+
+                /* distances to next face along each axis */
+                const double tx = (fabs(ex) > 1e-30) ? (grid->x_edges[fx] - px) / ex : INF;
+                const double ty = (fabs(ey) > 1e-30) ? (grid->y_edges[fy] - py) / ey : INF;
+                const double tz = (fabs(ez) > 1e-30) ? (grid->z_edges[fz] - pz) / ez : INF;
+
+                /* find minimum distance and step to the next cell */
+                double dl;
+                if (tx <= ty && tx <= tz) {
+                    dl = tx;
+                    px += ex*dl; py += ey*dl; pz += ez*dl;
+                    cx += sx;
+                } else if (ty <= tz) {
+                    dl = ty;
+                    px += ex*dl; py += ey*dl; pz += ez*dl;
+                    cy += sy;
+                } else {
+                    dl = tz;
+                    px += ex*dl; py += ey*dl; pz += ez*dl;
+                    cz += sz;
+                }
+
+                /* check if ray has exited the domain */
+                if (cx < 0 || cx >= NX || cy < 0 || cy >= NY || cz < 0 || cz >= NZ) {
+                    if (first_step) { atau_local = 0.0; }
+                    break;
+                }
+
+                size_t next_cell = (size_t)cx * NY * NZ + (size_t)cy * NZ + cz;
+                double ak0_next = ak0[next_cell];
+
+                /* discontinuity check: density ratio */
+                double ak0_ratio = (ak0_home > ak0_next)
+                    ? ak0_home / ak0_next : ak0_next / ak0_home;
+                if (ak0_next > 0.0 && ak0_ratio > atau_density_tol) {
+                    if (first_step) { atau_local = 0.0; }
+                    break;
+                }
+
+                /* discontinuity check: velocity jump along ray direction */
+                double vpar_next = grid->ux[next_cell]*ex
+                                 + grid->uy[next_cell]*ey
+                                 + grid->uz[next_cell]*ez;
+                if (fabs(vpar_home - vpar_next) > atau_velocity_tol) {
+                    if (first_step) { atau_local = 0.0; }
+                    break;
+                }
+
+                /* skip the home cell (don't accumulate its contribution) */
+                if (first_step) {
+                    first_step = false;
+                    continue;
+                }
+
+                /* accumulate a*tau along the ray */
+                atau_local += ak0_next * dl;
+
+                /* early termination: can't beat current minimum */
+                if (atau_local >= atau_min) break;
+            }
+            if (atau_local < atau_min) atau_min = atau_local;
+        }
+        grid->atau[cell] = atau_min;
     }
 }

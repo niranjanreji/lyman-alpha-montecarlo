@@ -1,5 +1,5 @@
 /* ================================================================
-   rt_definitions.h — compile-time configuration for the RT module.
+   rt_definitions.h - compile-time configuration for the RT module.
 
    For PLUTO-coupled builds, this is separate from PLUTO's
    definitions.h. Tests override this file by placing their own
@@ -39,35 +39,43 @@
 #define COUPLE_LYA_RT   TRUE
 
 /* Phase function for scattering angle.
-     DIPOLE     — RASCAS-style dipole (default)
-     ISOTROPIC  — isotropic scattering                              */
+     DIPOLE     - RASCAS-style dipole (default)
+     ISOTROPIC  - isotropic scattering                              */
 #define PHASE_FUNCTION   DIPOLE
 
 /* Voigt profile approximation.
-     SMITH2015      — continued-fraction (default)
-     HUMLICEK1982   — rational approximation, accurate in wings
-     TASITSIOMI2006 — analytic fitting                              */
+     SMITH2015      - continued-fraction (default)
+     HUMLICEK1982   - rational approximation, accurate in wings
+     TASITSIOMI2006 - analytic fitting                              */
 #define VOIGT_FUNCTION   SMITH2015
 
 /* How heating rates are passed to PLUTO.
-     FDV    — RT passes momentum only; PLUTO computes F dot v
-     DIRECT — RT tracks h*delta_nu per scatter, passes heating rate */
+     FDV    - RT passes momentum only; PLUTO computes F dot v
+     DIRECT - RT tracks h*delta_nu per scatter, passes heating rate */
 #define ENERGY_DEPOSIT   FDV
 
 /* Turns scatter-recoil on or off.                                  */
 #define RECOIL   TRUE
 
 /* assume fully neutral hydrogen (mu = 1).
-     TRUE  — density_fn returns n_HI directly, T = p * m_p / (rho * k)
-     FALSE — density_fn returns n_H, x_HI(T) computed from table,
+     TRUE  - density_fn returns n_HI directly, T = p * m_p / (rho * k)
+     FALSE - density_fn returns n_H, x_HI(T) computed from table,
              T solved iteratively with mu(x_HI)                      */
 #define FULLY_NEUTRAL   FALSE
+
+/* Turns core-skipping (acceleration scheme) on or off.
+     TRUE - scatterer velocities are biased to minimize scatter counts
+            using the algorithm used by COLT, RASCAS, etc. 
+            INCOMPATIBLE WITH COUPLE_LYA_RT.
+     FALSE - scatters are treated normally. Use FALSE if you 
+             want accurate momentum deposition.  */
+#define CORE_SKIPPING    FALSE
 
 /* ---- Domain & grid ---- */
 
 /* Boundary condition geometry.
-     FULL_BOX — all boundaries are escape boundaries
-     SLAB     — periodic in x/y, escape in z                       */
+     FULL_BOX - all boundaries are escape boundaries
+     SLAB     - periodic in x/y, escape in z                       */
 #define RTGEOMETRY       FULL_BOX
 
 #define NX               256       /* grid cells in x */
@@ -100,7 +108,7 @@
 
 /* ---- Build ---- */
 
-/* this flag is not needed when coupled — use the PLUTO parallel flag */
+/* this flag is not needed when coupled - use the PLUTO parallel flag */
 /* REMOVE the #define statement below for serial builds */
 #ifndef PARALLEL
 #define PARALLEL                     /* multi-node MPI support */

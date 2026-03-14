@@ -2,8 +2,7 @@
  * cross section. three implementations available, selected at
  * compile time via VOIGT_FUNCTION in rt_definitions.h.
  *
- * Niranjan Reji, Raman Research Institute, March 2026
- * assisted by Claude (Anthropic) */
+ * Niranjan Reji, Raman Research Institute, March 2026 */
 
 #include "common.h"
 #include <rt_definitions.h>

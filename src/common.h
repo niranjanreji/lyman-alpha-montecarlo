@@ -1,8 +1,7 @@
 /* common.h — shared constants, types, and declarations for the
  * lyman-alpha monte carlo radiative transfer code.
  *
- * Niranjan Reji, Raman Research Institute, March 2026
- * assisted by Claude (Anthropic) */
+ * Niranjan Reji, Raman Research Institute, March 2026 */
 
 #pragma once
 
@@ -90,6 +89,9 @@ struct Grid {
     std::vector<double> uy;
     std::vector<double> uz;
     std::vector<double> luminosity_CDF;
+
+    /* field used for core skipping */
+    std::vector<double> atau;
 
     int num_point_sources;                           /* number of point sources */
 
