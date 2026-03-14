@@ -2,6 +2,8 @@
 
 A Monte Carlo radiative transfer code for Lyman-alpha photons, designed for standalone use and coupling with the PLUTO hydrodynamics code.
 
+While this code was mainly written by me, AI agents have assisted in debugging and simplifying the codebase.
+
 ## Overview
 
 This code propagates Lyman-alpha photon packets through a 3D Cartesian grid, computing resonant scattering, momentum deposition, and energy exchange. It can run standalone (for benchmarking and testing) or coupled to PLUTO's 1D spherical hydro solver, where radiation forces and heating rates feed back into the gas dynamics.
