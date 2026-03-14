@@ -135,6 +135,14 @@ In coupled mode, PLUTO's `SplitSource()` drives the RT each hydro step:
 ### Force-based timestep constraint
 
 The coupling imposes a CFL-like constraint: the radiation force must not shift photon frequencies by more than a few thermal widths per step. The allowed velocity change is `dv_max = v_th * sqrt(ln(tau_drop))` where `tau_drop ~ 1e4`, giving `dv_max ~ 3 * v_th`. The timestep is then `dt = dv_max / (F/rho)`.
+The coupling imposes a CFL-like constraint on how much the radiation force can change the gas velocity in a single step. The Lyman-alpha cross section in the Doppler core goes as `sigma(x) ~ exp(-x^2)`, where `x = (nu - nu_0) / delta_nu_D` is the dimensionless frequency. A bulk velocity change `dv` shifts `x` by `dx = dv / v_th`. We require that the cross section not change by more than a factor `tau_drop` in one step:
+
+```
+exp(-(dv/v_th)^2) >= 1/tau_drop
+=> dv_max = v_th * sqrt(ln(tau_drop))
+```
+
+With `tau_drop = 1e4`, this gives `dv_max ~ 3 * v_th`. The timestep is then `dt = dv_max / a`, where `a = F/rho` is the radiation force acceleration.
 
 ## MPI parallelization
 
