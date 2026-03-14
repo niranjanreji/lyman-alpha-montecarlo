@@ -6,7 +6,9 @@ A Monte Carlo radiative transfer code for Lyman-alpha photons, designed for stan
 
 This code propagates Lyman-alpha photon packets through a 3D Cartesian grid, computing resonant scattering, momentum deposition, and energy exchange. It can run standalone (for benchmarking and testing) or coupled to PLUTO's 1D spherical hydro solver, where radiation forces and heating rates feed back into the gas dynamics.
 
-Key features:
+I have avoided uploading my modified PLUTO source code, since the files I modified were not written by me. However, I do explain what PLUTO source files I modify below (and how I modify them) so hypothetically, someone could use my code in conjunction with PLUTO quite easily.
+
+What we've got:
 - Compile-time configuration via `rt_definitions.h`
 - MPI parallelism (photon decomposition across ranks)
 - OpenMP threading within each rank
