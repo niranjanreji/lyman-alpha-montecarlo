@@ -159,14 +159,16 @@ With `tau_drop = 1e4`, this gives `dv_max ~ 3 * v_th`. The timestep is then `dt 
 ### Standalone
 
 ```
-make              # build standalone binary
-make test         # build and run all tests
-make clean
+make                           # build PLUTO + MPI binary
+make -f standalone.mk          # build standalone MPI binary
+make -f standalone.mk serial   # build standalone OpenMP-only binary
+make clean                     # clean PLUTO build
+make -f standalone.mk clean    # clean standalone build
 ```
 
 ### PLUTO-coupled
 
-The makefile integrates with PLUTO's build system. RT source files are compiled with `mpicxx` and linked alongside PLUTO's C objects. Key flags:
+The main makefile integrates with PLUTO's build system. RT source files are compiled with `mpicxx` and linked alongside PLUTO's C objects. Key flags:
 - `-DPARALLEL` from PLUTO's MPI configuration
 - `-I./src -I.` for RT headers
 - `-fopenmp` for OpenMP threading
