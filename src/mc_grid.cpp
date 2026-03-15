@@ -4,6 +4,7 @@
  *
  * Niranjan Reji, Raman Research Institute, March 2026 */
 
+#include <omp.h>
 #include <cstdio>
 #include <algorithm>
 
@@ -202,7 +203,9 @@ void build_fields(Grid* grid, DensityFunc density_fn, TemperatureFunc temperatur
 
     std::vector<double> grid_lum(n_cells, 0.0);
     double grid_luminosity = 0.0;
-
+    
+    /* collapse(3) fuses the iz-iy-ix nested loop below */
+    #pragma omp parallel for collapse(3) reduction(+:grid_luminosity) num_threads(OMP_NUM_THREADS)
     for (int iz = 0; iz < NZ; iz++) {
         for (int iy = 0; iy < NY; iy++) {
             for (int ix = 0; ix < NX; ix++) {
@@ -325,6 +328,7 @@ void minimum_a_tau(Grid* grid) {
     }
 
     /* now test a*tau and find the minimum for each cell */
+    #pragma omp parallel for schedule(dynamic, 64) num_threads(OMP_NUM_THREADS)
     for (size_t cell = 0; cell < n_cells; ++cell) {
         //std::cout << cell << std::endl;
         int iz = cell % NZ;

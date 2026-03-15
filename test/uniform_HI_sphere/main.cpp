@@ -1,4 +1,6 @@
-#include <mpi.h>
+#ifdef PARALLEL
+    #include <mpi.h>
+#endif
 #include <cstdio>
 #include <chrono>
 #include "common.h"

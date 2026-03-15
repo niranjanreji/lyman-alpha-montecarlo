@@ -94,7 +94,7 @@
    so that packet weight stays constant across varying timesteps.
    When DT_PHOTONS <= 0: scaling is disabled and exactly N_PHOTONS
    packets are emitted every timestep.                               */
-#define N_PHOTONS        50000    /* reference packet count */
+#define N_PHOTONS        100000   /* reference packet count */
 #define DT_PHOTONS       -1       /* reference timestep [s] */
 
 /* ---- Output & diagnostics ---- */
@@ -109,9 +109,7 @@
 /* ---- Build ---- */
 
 /* this flag is not needed when coupled — use the PLUTO parallel flag */
-#ifndef PARALLEL
-#define PARALLEL             TRUE   /* multi-node MPI support */
-#endif
-#define OMP_NUM_THREADS      2
+/* define PARALLEL if you want to use MPI.. */
+#define OMP_NUM_THREADS      16
 
 #endif /* LYART_RT_DEFINITIONS_H */
