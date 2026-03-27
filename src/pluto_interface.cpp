@@ -252,6 +252,7 @@ extern "C" {
         double* out_energy = d->out_energy;
         double* photon_energy = d->photon_energy;
         double* photon_count  = d->photon_count;
+        double* grid_photon_count = d->grid_photon_count;
         double gamma_gas = d->gamma_gas;
 
         /* validate PLUTO input arrays before any computation */
@@ -327,6 +328,7 @@ extern "C" {
 
         /* collect photon count and energy diagnostics */
         std::fill(photon_count, photon_count + n, 0.0);
+        std::fill(grid_photon_count, grid_photon_count + n, 0.0);
         std::fill(photon_energy, photon_energy + n, 0.0);
 
         for (size_t photon_idx = 0; photon_idx < p->data.size(); ++photon_idx) {
@@ -345,6 +347,7 @@ extern "C" {
             else i_bin = int(it - r);
 
             photon_count[i_bin] += 1.0;
+            if (phot.from_grid) grid_photon_count[i_bin] += 1.0;
             double nu_packet = nu_alpha * (1.0 + phot.x*phot.local_sqrt_temp*vth_const/c);
             photon_energy[i_bin] += phot.weight * h * nu_packet;
         }

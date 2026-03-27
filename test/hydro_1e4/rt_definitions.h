@@ -113,6 +113,6 @@
 #ifndef PARALLEL
 #define PARALLEL                     /* multi-node MPI support */
 #endif
-#define OMP_NUM_THREADS      2
+#define OMP_NUM_THREADS      1
 
 #endif /* LYART_RT_DEFINITIONS_H */

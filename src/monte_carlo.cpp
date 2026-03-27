@@ -64,7 +64,9 @@ long long monte_carlo(Photons& p, Grid& g, double dt) {
         if ( (rank - start + nprocs) % nprocs < remainder ) local_count++;
     #endif
 
+    double injected_before = g_lya_cum_photon_energy_injected;
     emit_photons(p, g, new_photon_count, local_count, dt);
+    double injected_local = g_lya_cum_photon_energy_injected - injected_before;
 
     /* debug output */
     int n_active = static_cast<int>(p.data.size());
@@ -195,14 +197,19 @@ long long monte_carlo(Photons& p, Grid& g, double dt) {
     double runtime_local = std::chrono::duration<double>(end - start_time).count();
     double runtime_max = runtime_local;
 
+    double injected_global = injected_local;
+
     #ifdef PARALLEL
         MPI_Allreduce(&escaped_local, &escaped_global, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
         MPI_Allreduce(&carry_local, &carry_global, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
         MPI_Allreduce(&scatters_local, &scatters_global, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
         MPI_Allreduce(&runtime_local, &runtime_max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
         MPI_Allreduce(&escaped_energy_local, &escaped_energy_global, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        MPI_Allreduce(&injected_local, &injected_global, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     #endif
 
+    /* reset to pre-emission value, then add the properly reduced total */
+    g_lya_cum_photon_energy_injected = injected_before + injected_global;
     if (rank == 0) g_lya_cum_photon_energy_escaped += escaped_energy_global;
 
     #ifdef PARALLEL

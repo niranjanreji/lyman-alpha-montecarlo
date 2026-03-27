@@ -1,9 +1,4 @@
-input/grid.h5
-output/test.py
-split_source.c
-init.c
-main.c
-rhs.c
-definitions.h
 test/hummer_redistribution/output/*.dat
 test/*/*.o
+test/*/*.log
+src/*.c

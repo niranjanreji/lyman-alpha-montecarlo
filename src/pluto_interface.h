@@ -22,8 +22,9 @@ typedef struct {
     double* dV;              /* hydro grid cell volumes (CGS) */
     double* out_force;       /* OUTPUT: force / volume */
     double* out_energy;      /* OUTPUT: energy rate / volume */
-    double* photon_count;    /* OUTPUT: num of photons in each cell */
-    double* photon_energy;   /* OUTPUT: sum(weight * h * nu / c) in each cell */
+    double* photon_count;        /* OUTPUT: num of photons in each cell */
+    double* grid_photon_count;   /* OUTPUT: num of grid-emitted photons in each cell */
+    double* photon_energy;       /* OUTPUT: sum(weight * h * nu / c) in each cell */
     long long num_scatters;  /* OUTPUT: total number of scatters */
 } LyaData;
 
@@ -41,6 +42,8 @@ extern double *g_lya_radEnergy;
 extern int     g_lya_radEnergySize;
 extern double *g_lya_photonCount;
 extern int     g_lya_photonCountSize;
+extern double *g_lya_gridPhotonCount;
+extern int     g_lya_gridPhotonCountSize;
 extern double *g_lya_photonEnergy;
 extern int     g_lya_photonEnergySize;
 
