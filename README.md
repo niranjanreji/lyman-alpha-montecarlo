@@ -156,7 +156,7 @@ With `tau_drop = 1e4`, this gives `dv_max ~ 3 * v_th`. The timestep is then `dt 
 
 ## Building
 
-### Standalone
+Place main.c (which constructs necessary structs and calls the monte-carlo function), rt_definitions.h, standalone.mk, and user_setup.cpp in the same folder if you would like to build the RT code by itself. You must add pluto.ini, definitions.h, your modified PLUTO source code and the main makefile if you would like to build a PLUTO coupled version.
 
 ```
 make                           # build PLUTO + MPI binary
