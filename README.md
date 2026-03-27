@@ -156,17 +156,19 @@ With `tau_drop = 1e4`, this gives `dv_max ~ 3 * v_th`. The timestep is then `dt 
 
 ## Building
 
-### Standalone
+Place main.c (which constructs necessary structs and calls the monte-carlo function), rt_definitions.h, standalone.mk, and user_setup.cpp in the same folder if you would like to build the RT code by itself. You must add pluto.ini, definitions.h, your modified PLUTO source code and the main makefile if you would like to build a PLUTO coupled version.
 
 ```
-make              # build standalone binary
-make test         # build and run all tests
-make clean
+make                           # build PLUTO + MPI binary
+make -f standalone.mk          # build standalone MPI binary
+make -f standalone.mk serial   # build standalone OpenMP-only binary
+make clean                     # clean PLUTO build
+make -f standalone.mk clean    # clean standalone build
 ```
 
 ### PLUTO-coupled
 
-The makefile integrates with PLUTO's build system. RT source files are compiled with `mpicxx` and linked alongside PLUTO's C objects. Key flags:
+The main makefile integrates with PLUTO's build system. RT source files are compiled with `mpicxx` and linked alongside PLUTO's C objects. Key flags:
 - `-DPARALLEL` from PLUTO's MPI configuration
 - `-I./src -I.` for RT headers
 - `-fopenmp` for OpenMP threading
