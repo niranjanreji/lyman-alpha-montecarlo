@@ -8,3 +8,4 @@ test/hydro_1e4/radial_profiles.mp4
 test/hydro_1e4/*.dbl
 test/hydro_1e4/*.out
 test/hydro_1e4/pluto
+.*
