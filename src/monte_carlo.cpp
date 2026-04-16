@@ -133,7 +133,7 @@ long long monte_carlo(Photons& p, Grid& g, double dt) {
 
             ++n_scatters;
         }
-
+        
         if (phot.escaped) {
             double nu_escape = nu_alpha * (1.0 + phot.x * phot.local_sqrt_temp * vth_const / c);
             if (std::isfinite(nu_escape) && nu_escape > 0.0) {

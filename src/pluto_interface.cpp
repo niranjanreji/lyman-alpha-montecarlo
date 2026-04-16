@@ -388,12 +388,8 @@ extern "C" {
                 out_force[pluto_idx] += mom_radial;
                 num_cells[pluto_idx] += 1;
 
-                #if ENERGY_DEPOSIT == DIRECT
-                    double energy_cell = (grid->energy[idx]) / (grid->dv);
-                    out_energy[pluto_idx] += energy_cell;
-                #else
-                    out_energy[pluto_idx] = 0;
-                #endif
+                double energy_cell = (grid->energy[idx]) / (grid->dv);
+                out_energy[pluto_idx] += energy_cell;
             }
         }
 
@@ -424,11 +420,7 @@ extern "C" {
             }
         }
 
-        /* clear grid momentum, energy for next timestep */
-        std::fill(grid->mom_x.begin(), grid->mom_x.end(), 0.0);
-        std::fill(grid->mom_y.begin(), grid->mom_y.end(), 0.0);
-        std::fill(grid->mom_z.begin(), grid->mom_z.end(), 0.0);
-        std::fill(grid->energy.begin(), grid->energy.end(), 0.0);
+        /* build_fields() resets momentum, energy grid for next call */
 
         #if PRINT_TO_FILE == YES
             freopen("/dev/tty", "w", stdout);

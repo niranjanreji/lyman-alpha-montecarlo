@@ -23,6 +23,12 @@
 void emit_photons(Photons& photons, Grid& grid, int total_num, int rank_num, double dt) {
     static int identifier = 0;
 
+    /* nothing to emit if there is no luminous source distribution. */
+    if (total_num <= 0 || rank_num <= 0 || grid.total_luminosity <= 0.0 ||
+        grid.luminosity_CDF.empty() || grid.luminosity_CDF.back() <= 0.0) {
+        return;
+    }
+
     /* compute weight: total photons in dt step / number of packets */
     double weight = (grid.total_luminosity * dt) / total_num;
 
@@ -57,6 +63,10 @@ void emit_photons(Photons& photons, Grid& grid, int total_num, int rank_num, dou
 
         /* binary search to find first entry >= r */
         auto it = std::lower_bound(grid.luminosity_CDF.begin(), grid.luminosity_CDF.end(), r);
+        if (it == grid.luminosity_CDF.end()) {
+            delete p;
+            continue;
+        }
         int j = int(it - grid.luminosity_CDF.begin());
 
         /* emission from grid cell */
@@ -84,6 +94,11 @@ void emit_photons(Photons& photons, Grid& grid, int total_num, int rank_num, dou
 
             p->x = sqrt_2 * sqrt(-log(r1)) * cos(two_pi * r2);
             p->from_grid = 1;
+
+            /* remove energy from gas corresponding to 
+             * photon packet energy */
+
+            grid.energy[j] -= weight * h_by_c * nu_alpha;
         }
         /* emission from point source */
         else {

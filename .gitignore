@@ -2,3 +2,4 @@ test/hummer_redistribution/output/*.dat
 test/*/*.o
 test/*/*.log
 src/*.c
+test/forcefac_vs_rad/output/*

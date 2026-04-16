@@ -193,6 +193,12 @@ void build_fields(Grid* grid, DensityFunc density_fn, TemperatureFunc temperatur
                   VelocityFunc velocity_fn) {
     size_t n_cells = grid->n_cells;
 
+    /* reset accumulated deposition so a rebuilt grid starts fresh */
+    fill(grid->mom_x.begin(), grid->mom_x.end(), 0.0);
+    fill(grid->mom_y.begin(), grid->mom_y.end(), 0.0);
+    fill(grid->mom_z.begin(), grid->mom_z.end(), 0.0);
+    fill(grid->energy.begin(), grid->energy.end(), 0.0);
+
     /* fill physical fields using provided function pointers
      * density_fn() returns total hydrogen number density n_H
      * n_HI is computed as n_H * x_HI(T) using the ionization table */
