@@ -78,9 +78,9 @@
      SLAB     - periodic in x/y, escape in z                       */
 #define RTGEOMETRY       FULL_BOX
 
-#define NX               256       /* grid cells in x */
-#define NY               256       /* grid cells in y */
-#define NZ               256       /* grid cells in z */
+#define NX               512       /* grid cells in x */
+#define NY               512       /* grid cells in y */
+#define NZ               512       /* grid cells in z */
 
 #define LX               6.2e18    /* domain size x [cm] */
 #define LY               6.2e18    /* domain size y [cm] */
