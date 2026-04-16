@@ -103,7 +103,9 @@ struct Grid {
     double total_luminosity;
 
     std::vector<double> mom_x, mom_y, mom_z;         /* momentum grid */
-    std::vector<double> energy;                       /* deposited energy grid (optional) */
+    std::vector<double> energy;                      /* deposited energy grid (optional) */
+
+    std::vector<double> collisional_frac;            /* fraction of grid luminosity from collisional excitation */
 };
 
 

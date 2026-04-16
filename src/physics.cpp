@@ -510,7 +510,7 @@ void scatter(Photon& phot, Grid& g, xso::rng& rng) {
 
     #if ENERGY_DEPOSIT == DIRECT
         #pragma omp atomic
-        g.energy[cell_idx] += w * h_by_c * (nu_old - nu_new);
+        g.energy[cell_idx] += w * h * (nu_old - nu_new);
     #endif
 
     phot.dir_x = new_dx; phot.dir_y = new_dy; phot.dir_z = new_dz;

@@ -95,10 +95,11 @@ void emit_photons(Photons& photons, Grid& grid, int total_num, int rank_num, dou
             p->x = sqrt_2 * sqrt(-log(r1)) * cos(two_pi * r2);
             p->from_grid = 1;
 
-            /* remove energy from gas corresponding to 
-             * photon packet energy */
-
-            grid.energy[j] -= weight * h_by_c * nu_alpha;
+            /* remove energy from gas corresponding
+             * to photon packet energy, specifically 
+             * the fraction that belongs to collisional
+             * excitation */
+            grid.energy[j] -= weight * h * nu_alpha*(1 + (p->x * vth_const * grid.sqrt_temp[j])/c) * grid.collisional_frac[j];
         }
         /* emission from point source */
         else {
