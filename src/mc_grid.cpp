@@ -139,7 +139,6 @@ Grid* init_grid(SourcesFunc sources_fn) {
     grid->mom_y.resize(n_cells);
     grid->mom_z.resize(n_cells);
     grid->energy.resize(n_cells);
-    grid->collisional_frac.resize(n_cells);
 
     #if CORE_SKIPPING == TRUE
         grid->atau.resize(n_cells);
@@ -199,7 +198,6 @@ void build_fields(Grid* grid, DensityFunc density_fn, TemperatureFunc temperatur
     fill(grid->mom_y.begin(), grid->mom_y.end(), 0.0);
     fill(grid->mom_z.begin(), grid->mom_z.end(), 0.0);
     fill(grid->energy.begin(), grid->energy.end(), 0.0);
-    fill(grid->collisional_frac.begin(), grid->collisional_frac.end(), 0.0);
 
     /* fill physical fields using provided function pointers
      * density_fn() returns total hydrogen number density n_H
@@ -254,7 +252,6 @@ void build_fields(Grid* grid, DensityFunc density_fn, TemperatureFunc temperatur
                         * (n_e  * lyalpha_rate_from_recomb(temp) * caseb_recomb_coeff(temp)
                          + n_HI * excitation_rate_coeff(temp));
                     grid_luminosity += grid_lum[idx];
-                    grid->collisional_frac[idx] = grid->dv * n_e * (n_HI * excitation_rate_coeff(temp)) / grid_lum[idx];
                 }
             }
         }

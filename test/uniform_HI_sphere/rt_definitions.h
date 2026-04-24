@@ -71,6 +71,12 @@
              want accurate momentum deposition.  */
 #define CORE_SKIPPING    TRUE
 
+/* Turns destruction mechanisms on or off. 
+     TRUE - 2p-2s, H2, dust destruction enabled. 
+            (NOT IMPLEMENTED YET!) 
+     FALSE - Lya photons never destroyed. */
+#define DESTRUCTION      FALSE
+
 /* ---- Domain & grid ---- */
 
 /* Boundary condition geometry.

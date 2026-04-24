@@ -63,6 +63,20 @@
              T solved iteratively with mu(x_HI)                     */
 #define FULLY_NEUTRAL   TRUE
 
+/* Turns core-skipping (acceleration scheme) on or off.
+     TRUE - scatterer velocities are biased to minimize scatter counts
+            using the algorithm used by COLT, RASCAS, etc. 
+            INCOMPATIBLE WITH COUPLE_LYA_RT.
+     FALSE - scatters are treated normally. Use FALSE if you 
+             want accurate momentum deposition.  */
+#define CORE_SKIPPING    FALSE
+
+/* Turns destruction mechanisms on or off. 
+     TRUE - 2p-2s, H2, dust destruction enabled. 
+            (NOT IMPLEMENTED YET!) 
+     FALSE - Lya photons never destroyed. */
+#define DESTRUCTION      FALSE
+
 /* ---- Domain & grid ---- */
 
 /* Boundary condition geometry.
@@ -86,7 +100,7 @@
    so that packet weight stays constant across varying timesteps.
    When DT_PHOTONS <= 0: scaling is disabled and exactly N_PHOTONS
    packets are emitted every timestep.                               */
-#define N_PHOTONS        50000    /* reference packet count */
+#define N_PHOTONS        100000    /* reference packet count */
 #define DT_PHOTONS       -1       /* reference timestep [s] */
 
 /* ---- Output & diagnostics ---- */

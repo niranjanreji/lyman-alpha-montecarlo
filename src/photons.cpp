@@ -99,7 +99,7 @@ void emit_photons(Photons& photons, Grid& grid, int total_num, int rank_num, dou
              * to photon packet energy, specifically 
              * the fraction that belongs to collisional
              * excitation */
-            grid.energy[j] -= weight * h * nu_alpha*(1 + (p->x * vth_const * grid.sqrt_temp[j])/c) * grid.collisional_frac[j];
+            grid.energy[j] -= weight * h * nu_alpha*(1 + (p->x * vth_const * grid.sqrt_temp[j])/c);
         }
         /* emission from point source */
         else {

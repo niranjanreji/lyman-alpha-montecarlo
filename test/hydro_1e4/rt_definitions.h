@@ -71,6 +71,12 @@
              want accurate momentum deposition.  */
 #define CORE_SKIPPING    FALSE
 
+/* Turns destruction mechanisms on or off. 
+     TRUE - 2p-2s, H2, dust destruction enabled. 
+            (NOT IMPLEMENTED YET!) 
+     FALSE - Lya photons never destroyed. */
+#define DESTRUCTION      FALSE
+
 /* ---- Domain & grid ---- */
 
 /* Boundary condition geometry.
@@ -78,9 +84,9 @@
      SLAB     - periodic in x/y, escape in z                       */
 #define RTGEOMETRY       FULL_BOX
 
-#define NX               512       /* grid cells in x */
-#define NY               512       /* grid cells in y */
-#define NZ               512       /* grid cells in z */
+#define NX               128       /* grid cells in x */
+#define NY               128       /* grid cells in y */
+#define NZ               128       /* grid cells in z */
 
 #define LX               6.2e18    /* domain size x [cm] */
 #define LY               6.2e18    /* domain size y [cm] */

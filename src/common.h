@@ -104,8 +104,6 @@ struct Grid {
 
     std::vector<double> mom_x, mom_y, mom_z;         /* momentum grid */
     std::vector<double> energy;                      /* deposited energy grid (optional) */
-
-    std::vector<double> collisional_frac;            /* fraction of grid luminosity from collisional excitation */
 };
 
 
@@ -151,11 +149,11 @@ double voigt_smith(double x, double a);
 double voigt_tasitsiomi(double x, double a);
 double voigt_humlicek(double x, double a);
 
-/* function pointer types for problem setup */
-typedef double (*DensityFunc)(double x, double y, double z);
-typedef double (*TemperatureFunc)(double x, double y, double z);
-typedef void   (*VelocityFunc)(double x, double y, double z,
-                               double *vx, double *vy, double *vz);
+/* function types for problem setup (std::function to allow capturing lambdas) */
+#include <functional>
+using DensityFunc     = std::function<double(double, double, double)>;
+using TemperatureFunc = std::function<double(double, double, double)>;
+using VelocityFunc    = std::function<void(double, double, double, double*, double*, double*)>;
 typedef void   (*SourcesFunc)(int *n_sources, double pos[][3], double lum[]);
 
 /* HI fraction table (mc_grid.cpp) */
