@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -l select=4:ncpus=32:mpiprocs=1:ompthreads=32
+#PBS -l place=scatter
+#PBS -N pluto_rt
+#PBS -q workq
+#PBS -o pbs_out.txt
+#PBS -e pbs_err.txt
+#PBS -j oe
+
+cd $PBS_O_WORKDIR
+
+export PATH=/data/software/openmpi-4.0.4/bin:$PATH
+export LD_LIBRARY_PATH=/data/software/openmpi-4.0.4/lib:$LD_LIBRARY_PATH
+export PATH=/data/software/gcc-10.4.0/bin:$PATH
+export LD_LIBRARY_PATH=/data/software/gcc-10.4.0/lib64:$LD_LIBRARY_PATH
+
+export OMP_NUM_THREADS=32
+
+mpirun --prefix /data/software/openmpi-4.0.4 -x PATH -x LD_LIBRARY_PATH -machinefile $PBS_NODEFILE --map-by ppr:1:node -np 4 ./pluto

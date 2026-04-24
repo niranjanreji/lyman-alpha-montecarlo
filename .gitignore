@@ -9,3 +9,4 @@ test/hydro_1e4/*.dbl
 test/hydro_1e4/*.out
 test/hydro_1e4/pluto
 .*
+test/*/*.png
